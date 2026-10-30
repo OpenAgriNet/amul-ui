@@ -20,7 +20,9 @@ export const routes = rootRoute("root.tsx", [
 		layout("chat-layout", "app/(_chat)/layout.tsx", [
 			route("/chat", "app/(_chat)/chat-screen/routes.ts"),
 			route("/settings", "app/(_chat)/settings/routes.ts")
-		])
+		]),
+		// Test-case entry for the evaluation dataset, behind VITE_ENABLE_TEST_CASE_ENTRY.
+		route("/test-cases", "app/(_testing)/test-cases/routes.ts")
 	]),
 	// Protected area behind authentication
 	middleware("authenticate.tsx", [

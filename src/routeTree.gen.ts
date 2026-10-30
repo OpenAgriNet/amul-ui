@@ -21,6 +21,7 @@ import { Route as publicWidgetRoutesRouteImport } from './pages/public/widget/ro
 import { Route as publicPrivacyPolicyRoutesRouteImport } from './pages/public/privacy-policy/routes'
 import { Route as authLoginRoutesRouteImport } from './pages/auth/login/routes'
 import { Route as authForgotPasswordRoutesRouteImport } from './pages/auth/forgot-password/routes'
+import { Route as app_testingTestCasesRoutesRouteImport } from './pages/app/(_testing)/test-cases/routes'
 import { Route as app_chatLayoutRouteImport } from './pages/app/(_chat)/layout'
 import { Route as app_authenticatedLayoutRouteImport } from './pages/app/(_authenticated)/layout'
 import { Route as app_chatSettingsRoutesRouteImport } from './pages/app/(_chat)/settings/routes'
@@ -87,6 +88,12 @@ const authForgotPasswordRoutesRoute =
     path: '/forgot-password',
     getParentRoute: () => middlewaresRestrictLoginSignupRoute,
   } as any)
+const app_testingTestCasesRoutesRoute =
+  app_testingTestCasesRoutesRouteImport.update({
+    id: '/test-cases',
+    path: '/test-cases',
+    getParentRoute: () => middlewaresPublicChatRoute,
+  } as any)
 const app_chatLayoutRoute = app_chatLayoutRouteImport.update({
   id: '/_chat-layout',
   getParentRoute: () => middlewaresPublicChatRoute,
@@ -119,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/404': typeof error404RoutesRoute
   '/500': typeof error500RoutesRoute
   '/error': typeof errorDefaultErrorRoutesRoute
+  '/test-cases': typeof app_testingTestCasesRoutesRoute
   '/forgot-password': typeof authForgotPasswordRoutesRoute
   '/login': typeof authLoginRoutesRoute
   '/privacy-policy': typeof publicPrivacyPolicyRoutesRoute
@@ -133,6 +141,7 @@ export interface FileRoutesByTo {
   '/404': typeof error404RoutesRoute
   '/500': typeof error500RoutesRoute
   '/error': typeof errorDefaultErrorRoutesRoute
+  '/test-cases': typeof app_testingTestCasesRoutesRoute
   '/forgot-password': typeof authForgotPasswordRoutesRoute
   '/login': typeof authLoginRoutesRoute
   '/privacy-policy': typeof publicPrivacyPolicyRoutesRoute
@@ -153,6 +162,7 @@ export interface FileRoutesById {
   '/error': typeof errorDefaultErrorRoutesRoute
   '/_authenticate/_app-layout': typeof app_authenticatedLayoutRouteWithChildren
   '/_public-chat/_chat-layout': typeof app_chatLayoutRouteWithChildren
+  '/_public-chat/test-cases': typeof app_testingTestCasesRoutesRoute
   '/_restrict-login-signup/forgot-password': typeof authForgotPasswordRoutesRoute
   '/_restrict-login-signup/login': typeof authLoginRoutesRoute
   '/_restrict-login-signup/privacy-policy': typeof publicPrivacyPolicyRoutesRoute
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/error'
+    | '/test-cases'
     | '/forgot-password'
     | '/login'
     | '/privacy-policy'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/error'
+    | '/test-cases'
     | '/forgot-password'
     | '/login'
     | '/privacy-policy'
@@ -202,6 +214,7 @@ export interface FileRouteTypes {
     | '/error'
     | '/_authenticate/_app-layout'
     | '/_public-chat/_chat-layout'
+    | '/_public-chat/test-cases'
     | '/_restrict-login-signup/forgot-password'
     | '/_restrict-login-signup/login'
     | '/_restrict-login-signup/privacy-policy'
@@ -309,6 +322,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authForgotPasswordRoutesRouteImport
       parentRoute: typeof middlewaresRestrictLoginSignupRoute
     }
+    '/_public-chat/test-cases': {
+      id: '/_public-chat/test-cases'
+      path: '/test-cases'
+      fullPath: '/test-cases'
+      preLoaderRoute: typeof app_testingTestCasesRoutesRouteImport
+      parentRoute: typeof middlewaresPublicChatRoute
+    }
     '/_public-chat/_chat-layout': {
       id: '/_public-chat/_chat-layout'
       path: ''
@@ -391,10 +411,12 @@ const app_chatLayoutRouteWithChildren = app_chatLayoutRoute._addFileChildren(
 
 interface middlewaresPublicChatRouteChildren {
   app_chatLayoutRoute: typeof app_chatLayoutRouteWithChildren
+  app_testingTestCasesRoutesRoute: typeof app_testingTestCasesRoutesRoute
 }
 
 const middlewaresPublicChatRouteChildren: middlewaresPublicChatRouteChildren = {
   app_chatLayoutRoute: app_chatLayoutRouteWithChildren,
+  app_testingTestCasesRoutesRoute: app_testingTestCasesRoutesRoute,
 }
 
 const middlewaresPublicChatRouteWithChildren =

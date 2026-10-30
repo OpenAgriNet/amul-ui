@@ -1,10 +1,10 @@
-import { List, MessagesSquare } from "lucide-react";
+import { ClipboardCheck, List, MessagesSquare } from "lucide-react";
 import { ChatHeader } from "@/components/screens-component/layouts/chat-header";
 import { Button } from "@/components/ui/button";
 import { ChatInput, type ChatInputPayload } from "@/components/screens-component/chat-screen/components/chat-input";
 import { CHAT_ASSISTANT, CHAT_USER, type FAQCategoryId } from "@/components/screens-component/chat-screen/config";
 import { useChatStore } from "@/hooks/store/chat";
-import { Outlet } from "@tanstack/react-router";
+import { Outlet, useNavigate } from "@tanstack/react-router";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useCallback, useState, useEffect } from "react";
 import { Toast } from "@/components/screens-component/chat-screen/components/toast";
@@ -39,6 +39,7 @@ function ChatLayout() {
 	const showQuestionList = useChatStore((s) => s.showQuestionList);
 	const openQuestionList = useChatStore((s) => s.openQuestionList);
 	const closeQuestionList = useChatStore((s) => s.closeQuestionList);
+	const navigate = useNavigate();
 
 	const { language, t } = useLanguage();
 	const [settingsOpen, setSettingsOpen] = useState(false);
@@ -57,9 +58,12 @@ function ChatLayout() {
 	// without clearing it. The doctor persona has no question list.
 	const hasConversation = messages.length > 0 && persona !== "doctor";
 	const isOnQuestionList = hasConversation && showQuestionList;
-	const questionListToggle = hasConversation ? (
-		<div className="mb-2 flex justify-center">
-			<Button
+	const openTestCases = () => navigate({ to: "/test-cases" });
+	// Test-case entry (dev only): the test-cases screen imports this chat on arrival.
+	const showSaveAsTestCase = environment.testCaseEntryEnabled && messages.length > 0 && !showQuestionList;
+	const questionListToggle = hasConversation || showSaveAsTestCase ? (
+		<div className="mb-2 flex flex-wrap justify-center gap-2">
+			{hasConversation && <Button
 				type="button"
 				variant="outline"
 				disabled={isAssistantTyping}
@@ -68,7 +72,19 @@ function ChatLayout() {
 			>
 				{isOnQuestionList ? <MessagesSquare className="size-5" /> : <List className="size-5" />}
 				{(isOnQuestionList ? t("backToConversation") : t("seeMoreQuestions")) as string}
-			</Button>
+			</Button>}
+			{showSaveAsTestCase && (
+				<Button
+					type="button"
+					variant="outline"
+					disabled={isAssistantTyping}
+					onClick={openTestCases}
+					className="min-h-[44px] gap-2 rounded-full border-[#019444] bg-white px-5 text-sm font-semibold text-[#017A38] cursor-pointer hover:bg-[#EEFFF4] hover:text-[#017A38]"
+				>
+					<ClipboardCheck className="size-5" />
+					Save as test case
+				</Button>
+			)}
 		</div>
 	) : null;
 
@@ -129,6 +145,7 @@ function ChatLayout() {
 				showPersonaSelector={environment.doctorPersonaSelectorEnabled}
 				persona={persona}
 				onPersonaChange={setPersona}
+				onOpenTestCases={environment.testCaseEntryEnabled ? openTestCases : undefined}
 			/>
 
 			{/* Alert cards */}
