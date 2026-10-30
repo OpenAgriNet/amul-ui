@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, MessageCircleQuestionMark, User } from "lucide-react";
+import { ChevronDown, ChevronLeft, ClipboardCheck, MessageCircleQuestionMark, User } from "lucide-react";
 import langIcon from "@/assets/langIcon.svg";
 import amulText from "@/assets/amulText.svg";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,8 @@ export type ChatHeaderProps = {
 	showPersonaSelector?: boolean;
 	persona?: ChatPersona;
 	onPersonaChange?: (persona: ChatPersona) => void;
+	// Only passed when the test-case entry flag is on.
+	onOpenTestCases?: () => void;
 };
 
 function PersonaSelector({
@@ -61,6 +63,7 @@ export function ChatHeader(props: ChatHeaderProps) {
 		onPersonaChange,
 		onBack,
 		backDisabled = false,
+		onOpenTestCases,
 	} = props;
 
 	const { language, t } = useLanguage();
@@ -156,6 +159,19 @@ export function ChatHeader(props: ChatHeaderProps) {
 							<img src={langIcon} alt="Language" className="h-6 w-6" />
 						</Button>
 					</LanguageSelectionDropdown>
+
+					{onOpenTestCases && (
+						<Button
+							variant="ghost"
+							size="icon"
+							aria-label="Add test cases"
+							title="Add test cases"
+							className="h-10 w-10 text-[#F65151] cursor-pointer hover:bg-[#FFE2E2] hover:text-[#D93B3B]"
+							onClick={onOpenTestCases}
+						>
+							<ClipboardCheck className="h-6 w-6" strokeWidth={2} />
+						</Button>
+					)}
 
 					{/* FAQ: the drawer behind this button is the suggested-question
 					    list, so it carries a chat bubble with a question mark rather

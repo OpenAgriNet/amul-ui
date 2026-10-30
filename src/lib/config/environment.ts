@@ -15,4 +15,6 @@ export const environment = {
   transcriptionProvider: (import.meta.env.VITE_TRANSCRIPTION_PROVIDER as string) || 'bhashini',
   /** Exposes the test-only farmer/doctor selector in the chat header. */
   doctorPersonaSelectorEnabled: parseBooleanFlag(import.meta.env.VITE_ENABLE_DOCTOR_PERSONA_SELECTOR),
+  /** Exposes the test-case entry screen (/test-cases) for dataset annotators. Dev only. */
+  testCaseEntryEnabled: parseBooleanFlag(import.meta.env.VITE_ENABLE_TEST_CASE_ENTRY),
 };
