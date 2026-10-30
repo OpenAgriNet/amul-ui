@@ -48,7 +48,7 @@ describe("welcome quick actions", () => {
 		const bundle = BUNDLES[lang];
 		const actions = buildQuickActions(makeT(bundle));
 
-		expect(actions).toHaveLength(10);
+		expect(actions).toHaveLength(11);
 
 		const weatherCard = actions[2];
 		if (!weatherCard) throw new Error(`no third card for ${lang}`);
@@ -56,5 +56,22 @@ describe("welcome quick actions", () => {
 		expect(weatherCard.icon).toBe("cloud");
 		expect(weatherCard.kind).toBe("ask");
 		expect(bundle.fixedQuestions).not.toContain(weatherCard.title);
+	});
+
+	// AMUL-118: the animal-details question is the second fixed card. It is also
+	// in the random pool, so it has to match that entry exactly for the pool to
+	// drop it; otherwise the random tail could show it a second time.
+	it.each(Object.keys(BUNDLES))("puts the animal-details question second among the fixed cards, once (%s)", (lang) => {
+		const bundle = BUNDLES[lang];
+		const animalDetails = bundle.fixedQuestions[1];
+		expect(animalDetails).toContain("AI");
+		expect(bundle.questions).toContain(animalDetails);
+
+		for (let i = 0; i < 20; i++) {
+			const titles = buildQuickActions(makeT(bundle)).map((action) => action.title);
+			const fixedCards = titles.filter((title) => bundle.fixedQuestions.includes(title));
+			expect(fixedCards[1]).toBe(animalDetails);
+			expect(titles.filter((title) => title === animalDetails)).toHaveLength(1);
+		}
 	});
 });
