@@ -4,6 +4,7 @@ import type { ChatMessage } from "@/components/screens-component/chat-screen/com
 import { buildTemplateCsv, parseBulkCsv, parseBulkRows, parseCsv } from "./csv";
 import { buildPayload, detectLanguage, emptyDraft, hasErrors, MAX_EXCHANGES, nextRole, turnsFromChat, validateDraft } from "./draft";
 import { TEST_OPTIONS } from "./test-fixtures";
+import { templateSheetData } from "./xlsx";
 import type { TestCaseDraft } from "./types";
 
 const at = "2026-10-29T00:00:00.000Z";
@@ -64,6 +65,16 @@ describe("test case drafts", () => {
 		expect(payload.chat?.removed_turn_count).toBe(1);
 	});
 
+	it("blocks a chat case with no session id instead of sending an empty one", () => {
+		const turns = [
+			{ id: "1", role: "user" as const, content: "Hi" },
+			{ id: "2", role: "assistant" as const, content: "Hello" }
+		];
+		const draft: TestCaseDraft = { ...emptyDraft("chat"), description: "A chat that lost its session id.", turns };
+		expect(validateDraft(draft).map((i) => i.message)).toContain("This chat has no session id. Go back to the chat and import it again.");
+		expect(hasErrors(validateDraft({ ...draft, sessionId: "s1" }))).toBe(false);
+	});
+
 	it("never sends original_content or trace_id on Write or bulk cases", () => {
 		const turns = [
 			{ id: "1", role: "user" as const, content: "Hi" },
@@ -93,6 +104,7 @@ describe("test case drafts", () => {
 		const draft: TestCaseDraft = {
 			...emptyDraft("chat"),
 			description: "Bot gave the wrong dose for a calf.",
+			sessionId: "s1",
 			turns: [
 				{ id: "1", role: "user", content: "Dose for a calf?", originalContent: "Dose for a calf?" },
 				{ id: "2", role: "assistant", content: "Give 5 ml.", originalContent: "Give 50 ml." },
@@ -106,7 +118,7 @@ describe("test case drafts", () => {
 			{ role: "user", content: "Dose for a calf?" },
 			{ role: "assistant", content: "Give 5 ml.", original_content: "Give 50 ml." }
 		]);
-		expect(payload.chat).toEqual({ session_id: "", removed_turn_count: 1 });
+		expect(payload.chat).toEqual({ session_id: "s1", removed_turn_count: 1 });
 		expect(payload).not.toHaveProperty("bulk");
 	});
 
@@ -248,6 +260,13 @@ describe("bulk CSV", () => {
 		expect(issues(narrow)).toContain('Row 2: unknown tag "vet_office".');
 	});
 
+	it("makes every template cell a text cell, with blank rows to fill in", () => {
+		const sheet = templateSheetData(TEST_OPTIONS);
+		expect(sheet.length).toBeGreaterThan(500);
+		expect(sheet.flat().every((cell) => cell.format === "@")).toBe(true);
+		expect(sheet.every((row) => row.length === sheet[0]?.length)).toBe(true);
+	});
+
 	it("reads other_topic, so a General / other case can pass", () => {
 		const header = ["case_id", "role", "content", "description", "tags", "other_topic"];
 		const rows = (topic: string) => [
@@ -267,6 +286,8 @@ describe("bulk CSV", () => {
 			parseBulkRows([header, ...rows], TEST_OPTIONS).cases.map((c) => [c.draft.language, c.issues.map((i) => i.message).filter((m) => !m.includes("bot answer"))]);
 		expect(run([["1", "user", "Hi", "Question about bonus rules.", "Gujarati"]])).toEqual([["gu", []]]);
 		expect(run([["1", "user", "ગાયને તાવ છે", "Fever question in Gujarati.", ""]])).toEqual([["gu", []]]);
+		expect(run([["1", "user", "गाय को बुखार है", "Fever question in Devanagari.", "हिन्दी"]])).toEqual([["hi", []]]);
+		expect(run([["1", "user", "गाय को बुखार है", "Fever question in Devanagari.", "हिंदी"]])).toEqual([["hi", []]]);
 		const [devanagari] = run([["1", "user", "गाय को बुखार है", "Fever question in Devanagari.", ""]]);
 		expect(devanagari?.[1]).toEqual(["Case 1: the script of the questions doesn't say the language. Write it in the language column, like hi or mr."]);
 		const [unknown] = run([["1", "user", "Hi", "Question about bonus rules.", "Klingon"]]);

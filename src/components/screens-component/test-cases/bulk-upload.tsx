@@ -5,20 +5,25 @@ import { cn } from "@/lib/utils";
 import { submitTestCase, TestCaseApiError } from "@/lib/test-cases/api";
 import { MAX_BULK_CASES, parseBulkCsv, parseBulkRows, type BulkCase } from "@/lib/test-cases/csv";
 import { buildPayload, hasErrors } from "@/lib/test-cases/draft";
-import { useTestCaseOptions } from "@/hooks/store/test-cases/options";
+import type { TestCaseOptions } from "@/lib/test-cases/options";
 import { downloadTemplateXlsx, readXlsxRows } from "@/lib/test-cases/xlsx";
 
 /* eslint-disable no-unused-vars */
 type BulkUploadProps = {
 	// The tester picked above the tabs; sent as submitted_by on every case.
 	submittedBy: string;
-	onFinished: (result: { submitted: number; failed: number }) => void;
+	options: TestCaseOptions;
+	// notSent: cases left out because the run stopped early.
+	onFinished: (result: { submitted: number; failed: number; notSent: number }) => void;
 };
 /* eslint-enable no-unused-vars */
 
 type RowStatus = "ready" | "invalid" | "submitting" | "submitted" | "failed";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
+// A dropped connection (0), sign-in, route switch or storage problem would fail every
+// other case too, so the run stops at the first one.
+const STOP_STATUSES = new Set([0, 401, 404, 503]);
 
 const STATUS_META: Record<RowStatus, { label: string; className: string }> = {
 	ready: { label: "Ready", className: "bg-[#EEFFF4] text-[#017A38]" },
@@ -28,9 +33,7 @@ const STATUS_META: Record<RowStatus, { label: string; className: string }> = {
 	failed: { label: "Failed", className: "bg-red-50 text-red-700" }
 };
 
-export function BulkUpload({ submittedBy, onFinished }: BulkUploadProps) {
-	// The screen only shows this tab once the lists have loaded.
-	const options = useTestCaseOptions((s) => s.options)!;
+export function BulkUpload({ submittedBy, options, onFinished }: BulkUploadProps) {
 	const tagLabels = new Map(options.tags.map((o) => [o.value, o.label]));
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const [fileName, setFileName] = useState<string | null>(null);
@@ -98,8 +101,9 @@ export function BulkUpload({ submittedBy, onFinished }: BulkUploadProps) {
 		setRunning(true);
 		let submitted = 0;
 		let failed = 0;
-		for (const bulkCase of cases) {
-			if (!readyIds.includes(bulkCase.caseId)) continue;
+		let notSent = 0;
+		const queue = cases.filter((c) => readyIds.includes(c.caseId));
+		for (const [index, bulkCase] of queue.entries()) {
 			setStatuses((s) => ({ ...s, [bulkCase.caseId]: "submitting" }));
 			try {
 				await submitTestCase(buildPayload(bulkCase.draft, { submittedBy, bulkCaseId: bulkCase.caseId }));
@@ -112,12 +116,14 @@ export function BulkUpload({ submittedBy, onFinished }: BulkUploadProps) {
 				const reason = error instanceof TestCaseApiError ? error : null;
 				const detail = reason?.fieldErrors.map((e) => e.msg).join("; ") || reason?.message;
 				setFailures((f) => ({ ...f, [bulkCase.caseId]: detail ?? "Could not submit. Try again." }));
-				// The same sign-in or switch problem would fail every other case too.
-				if (reason && (reason.status === 401 || reason.status === 404)) break;
+				if (reason && STOP_STATUSES.has(reason.status)) {
+					notSent = queue.length - index - 1;
+					break;
+				}
 			}
 		}
 		setRunning(false);
-		onFinished({ submitted, failed });
+		onFinished({ submitted, failed, notSent });
 	};
 
 	return (

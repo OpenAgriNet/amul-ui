@@ -30,7 +30,8 @@ const LANGUAGE_CODES = new Map<string, string>([
 	...Object.entries(ENGLISH_LANGUAGE_NAMES),
 	...Object.values(LANGUAGES).flatMap((language): [string, string][] => [
 		[language.code, language.code],
-		[language.name.toLowerCase(), language.code]
+		[language.name.toLowerCase(), language.code],
+		[language.nativeName.toLowerCase(), language.code]
 	])
 ]);
 

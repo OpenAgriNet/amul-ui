@@ -107,6 +107,10 @@ export function validateDraft(draft: TestCaseDraft): TestCaseIssue[] {
 		});
 	}
 
+	if (draft.source === "chat" && !draft.sessionId) {
+		issues.push({ level: "error", message: "This chat has no session id. Go back to the chat and import it again." });
+	}
+
 	if (draft.tags.includes(OTHER_TAG_VALUE) && !draft.otherTopic.trim()) {
 		issues.push({ level: "error", message: "You picked General / other. Write what the test case is about." });
 	}
@@ -155,8 +159,8 @@ export function buildPayload(
 			...(draft.source === "chat" && isTurnEdited(turn) ? { original_content: turn.originalContent?.trim() } : {}),
 			...(turn.role === "assistant" && draft.source === "chat" && turn.traceId ? { trace_id: turn.traceId } : {})
 		})),
-		...(draft.source === "chat"
-			? { chat: { session_id: draft.sessionId ?? "", removed_turn_count: draft.turns.filter((turn) => turn.removed && turn.originalContent !== undefined).length } }
+		...(draft.source === "chat" && draft.sessionId
+			? { chat: { session_id: draft.sessionId, removed_turn_count: draft.turns.filter((turn) => turn.removed && turn.originalContent !== undefined).length } }
 			: {}),
 		...(draft.source === "bulk" ? { bulk: { case_id: options.bulkCaseId ?? "" } } : {})
 	};

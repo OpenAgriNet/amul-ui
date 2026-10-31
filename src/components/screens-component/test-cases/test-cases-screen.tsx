@@ -37,7 +37,7 @@ export function TestCasesScreen() {
 	const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 	const closeToast = useCallback(() => setToast(null), []);
 
-	const chatTurnCount = turnsFromChat(messages).length;
+	const chatTurnCount = useMemo(() => turnsFromChat(messages).length, [messages]);
 	const optionsStatus = useTestCaseOptions((s) => s.status);
 	const options = useTestCaseOptions((s) => s.options);
 	const optionsError = useTestCaseOptions((s) => s.error);
@@ -266,11 +266,15 @@ export function TestCasesScreen() {
 								<TabsContent value="bulk" className="pb-4">
 									<BulkUpload
 										submittedBy={testerId}
-										onFinished={({ submitted, failed }) =>
+										options={options}
+										onFinished={({ submitted, failed, notSent }) =>
 											setToast(
 												failed > 0
 													? {
-															message: `${submitted} submitted, ${failed} failed. Try the failed ones again.`,
+															message:
+																notSent > 0
+																	? `${submitted} submitted, ${failed} failed, ${notSent} not sent. Fix the problem, then submit again.`
+																	: `${submitted} submitted, ${failed} failed. Try the failed ones again.`,
 															type: "error"
 														}
 													: {
