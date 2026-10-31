@@ -25,6 +25,8 @@ export type CardMessage = MessageBase & {
 	actions?: { id: string; label: string }[];
 	showListenRow?: boolean;
 	isError?: boolean;
+	// X-Trace-Id of the chat response, kept so a saved test case can point at the trace.
+	traceId?: string;
 	artifacts?: import("@/lib/chat-artifacts").ChatArtifact[];
 };
 

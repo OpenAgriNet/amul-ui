@@ -3,7 +3,7 @@ import type { ChatMessage, TextMessage } from "@/components/screens-component/ch
 
 import { fetchSuggestions, type Suggestion } from "@/components/screens-component/chat-screen/api/suggestions-api";
 import apiService from "@/lib/api-service";
-import { environment } from "@/lib/config/environment";
+import { getUiFlags, loadUiFlags } from "@/lib/ui-flags";
 import { resolveChatPersona, type ChatPersona } from "@/lib/chat-persona";
 import * as telemetry from "@/lib/telemetry";
 import { randomPick, shuffle, filterVariableValues } from "@/lib/qa-utils";
@@ -330,11 +330,16 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 		if (typeof sessionStorage !== "undefined") {
 			sessionStorage.removeItem(ANONYMOUS_BOOTSTRAP_SESSION_KEY);
 		}
-		const persona = resolveChatPersona(
-			user?.userType ?? user?.user_type ?? user?.user_metadata?.user_type,
-			environment.doctorPersonaSelectorEnabled,
-		);
-		set({ sessionId: sid, persona });
+		const resolvePersona = () =>
+			resolveChatPersona(
+				user?.userType ?? user?.user_type ?? user?.user_metadata?.user_type,
+				getUiFlags().doctorPersonaSelector,
+			);
+		set({ sessionId: sid, persona: resolvePersona() });
+		// The flags may still be on their way; apply them unless the chat has started.
+		void loadUiFlags().then(() => {
+			if (get().sessionId === sid && get().messages.length === 0) set({ persona: resolvePersona() });
+		});
 		apiService.setSessionId(sid);
 		try {
 			telemetry.startTelemetry(sid, { 
@@ -359,7 +364,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 	setPersona: (persona) => {
 		// Only the flagged-on build has a selector to call this; ignore anything
 		// else so the persona cannot be switched on a build that hides it.
-		if (!environment.doctorPersonaSelectorEnabled) return;
+		if (!getUiFlags().doctorPersonaSelector) return;
 		if (get().persona === persona) return;
 		const sid = uuidv4();
 		set({
@@ -464,6 +469,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 			let streamingText = "";
 			let streamedArtifacts: ChatArtifact[] = [];
 			let inlineSuggestions: string[] | null = null;
+			let traceId: string | undefined;
 			const _response = await apiService.sendUserQuery(
 				trimmed,
 				currentSession,
@@ -484,17 +490,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 							return {
 								messages: [
 									...state.messages.slice(0, -1),
-									{ ...lastMsg, body: displayBody, artifacts: streamedArtifacts }
+									{ ...lastMsg, body: displayBody, artifacts: streamedArtifacts, traceId }
 								]
 							};
 						} else {
 							return {
-								messages: [...state.messages, { ...makeAssistantMessage(displayBody), artifacts: streamedArtifacts, questionId, questionText: trimmed }]
+								messages: [...state.messages, { ...makeAssistantMessage(displayBody), artifacts: streamedArtifacts, traceId, questionId, questionText: trimmed }]
 							};
 						}
 					});
 				},
-				environment.doctorPersonaSelectorEnabled ? persona : undefined,
+				getUiFlags().doctorPersonaSelector ? persona : undefined,
+				(id) => {
+					traceId = id;
+				}
 			);
 			if (isTurnStale()) return;
 

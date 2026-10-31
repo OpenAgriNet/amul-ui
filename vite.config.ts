@@ -80,7 +80,7 @@ export default defineConfig(({ mode }) => {
 		server: {
 			port: 3000,
 			// In dev, proxy /api to the real API so you avoid CORS without hardcoding domains.
-			// Set VITE_API_BASE_URL=/api and VITE_DEV_PROXY_TARGET=https://api.prod.amulai.in in .env
+			// Leave VITE_API_BASE_URL empty and set VITE_DEV_PROXY_TARGET in .env (see .env.example).
 			proxy
 		}
 	};

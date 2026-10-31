@@ -12,8 +12,6 @@ services:
         VITE_API_KEY: ${VITE_API_KEY:-}
         VITE_TELEMETRY_URL: ${VITE_TELEMETRY_URL:-/observability-service}
         VITE_OSS_TRANSLATE_SESSION_PERCENT: ${VITE_OSS_TRANSLATE_SESSION_PERCENT:-10}
-        VITE_ENABLE_DOCTOR_PERSONA_SELECTOR: ${VITE_ENABLE_DOCTOR_PERSONA_SELECTOR:-false}
-        VITE_ENABLE_TEST_CASE_ENTRY: ${VITE_ENABLE_TEST_CASE_ENTRY:-false}
         MODE: ${MODE:-production}
     image: vistaar-ui-service
     ports:

@@ -10,6 +10,7 @@ import { queryClient } from "./hooks";
 import PageNotFound from "./pages/error/404";
 import DefaultError from "./pages/error/default-error";
 import { createRouteProgress } from "./config/route-progress";
+import { loadUiFlags } from "./lib/ui-flags";
 window.addEventListener("vite:preloadError", async (event) => {
 	event.preventDefault();
 	// Get current count from session storage or initialize to 0
@@ -69,6 +70,9 @@ router.subscribe("onResolved", () => {
 import { LanguageProvider } from "./components/LanguageProvider";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ConfigProvider } from "./hooks/ConfigProvider";
+
+// Not awaited: farmers should not wait for flags that only testers need.
+void loadUiFlags();
 
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>

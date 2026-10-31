@@ -110,7 +110,7 @@ export function TurnEditor({ draft, onChange, errorTurnIds }: TurnEditorProps) {
 										variant="ghost"
 										size="sm"
 										onClick={() => onChange((d) => mapTurn(d, turn.id, (t) => ({ ...t, content: t.originalContent ?? t.content })))}
-										className="h-9 text-gray-600 hover:bg-gray-100"
+										className="h-9 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
 									>
 										<RotateCcw className="size-4" />
 										<span className="hidden sm:inline">Undo edit</span>
@@ -136,33 +136,38 @@ export function TurnEditor({ draft, onChange, errorTurnIds }: TurnEditorProps) {
 								const content = event.target.value;
 								onChange((d) => mapTurn(d, turn.id, (t) => ({ ...t, content })));
 							}}
-							className="max-h-[50vh] min-h-20 resize-y border-gray-200 bg-white text-[15px] leading-relaxed"
+							className="max-h-[50vh] min-h-20 resize-y rounded-xl border-gray-200 bg-white text-[15px] leading-relaxed shadow-none placeholder:text-gray-400 focus-visible:border-[#F65151] focus-visible:ring-[#F65151]/20"
 						/>
 					</div>
 				);
 			})}
 
-			<div className="flex flex-wrap gap-2">
-				{(["user", "assistant"] as const).map((role) => {
-					const meta = ROLE_META[role];
-					const suggested = role === suggestedRole;
-					return (
-						<Button
-							key={role}
-							type="button"
-							variant="outline"
-							onClick={() => addTurn(role)}
-							className={cn(
-								"min-h-11 flex-1 rounded-full border-dashed bg-white sm:flex-none",
-								suggested ? "border-[#F65151] text-[#F65151] hover:bg-[#FFE2E2] hover:text-[#D93B3B]" : "text-gray-600"
-							)}
-						>
-							<Plus className="size-4" />
-							Add {meta.noun}
-						</Button>
-					);
-				})}
-			</div>
+			{/* A chat draft holds what was said; turns written by hand go in the Write tab. */}
+			{draft.source !== "chat" && (
+				<div className="flex flex-wrap gap-2">
+					{(["user", "assistant"] as const).map((role) => {
+						const meta = ROLE_META[role];
+						const suggested = role === suggestedRole;
+						return (
+							<Button
+								key={role}
+								type="button"
+								variant="outline"
+								onClick={() => addTurn(role)}
+								className={cn(
+									"min-h-11 flex-1 rounded-full border-dashed bg-white sm:flex-none",
+									suggested
+										? "border-[#F65151] text-[#F65151] hover:bg-[#FFE2E2] hover:text-[#D93B3B]"
+										: "border-gray-300 text-gray-600 hover:border-[#F65151]/60 hover:bg-[#FFE2E2]/40 hover:text-[#D93B3B]"
+								)}
+							>
+								<Plus className="size-4" />
+								Add {meta.noun}
+							</Button>
+						);
+					})}
+				</div>
+			)}
 		</div>
 	);
 }

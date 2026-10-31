@@ -95,6 +95,12 @@ class ApiService {
     return null;
   }
 
+  /** The signed-in user's token, for callers that use fetch() so a 401 does not redirect to /error. */
+  getBearerToken(): string | null {
+    this.refreshAuthToken();
+    return this.authToken;
+  }
+
   private refreshAuthToken(): void {
     this.authToken = this.getAuthToken();
     if (this.authToken) {
@@ -144,7 +150,8 @@ class ApiService {
     sourceLang: string,
     targetLang: string,
     onStreamData?: (data: string) => void,
-    persona?: ChatPersona
+    persona?: ChatPersona,
+    onTraceId?: (traceId: string) => void
   ): Promise<ChatResponse> {
     try {
       this.refreshAuthToken();
@@ -191,6 +198,10 @@ class ApiService {
           }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        // Read before the stream so the id is known while the answer is still arriving.
+        const traceId = response.headers.get('X-Trace-Id');
+        if (traceId && onTraceId) onTraceId(traceId);
 
         const reader = response.body?.getReader();
         if (!reader) {

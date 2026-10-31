@@ -1,4 +1,4 @@
-import { ClipboardCheck, List, MessagesSquare } from "lucide-react";
+import { List, MessagesSquare } from "lucide-react";
 import { ChatHeader } from "@/components/screens-component/layouts/chat-header";
 import { Button } from "@/components/ui/button";
 import { ChatInput, type ChatInputPayload } from "@/components/screens-component/chat-screen/components/chat-input";
@@ -13,7 +13,7 @@ import { ProfileDialog } from "@/components/screens-component/profile/profile-di
 import { FarmerAlert } from "@/components/screens-component/chat-screen/components/farmer-alert";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/apis/profile";
-import { environment } from "@/lib/config/environment";
+import { useUiFlags } from "@/lib/ui-flags";
 
 const OPEN_FAQ_PANEL_EVENT = "open-faq-panel";
 
@@ -42,6 +42,7 @@ function ChatLayout() {
 	const navigate = useNavigate();
 
 	const { language, t } = useLanguage();
+	const flags = useUiFlags();
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [faqExpandCategory, setFaqExpandCategory] = useState<FAQCategoryId | undefined>();
 	const [profileOpen, setProfileOpen] = useState(false);
@@ -59,11 +60,9 @@ function ChatLayout() {
 	const hasConversation = messages.length > 0 && persona !== "doctor";
 	const isOnQuestionList = hasConversation && showQuestionList;
 	const openTestCases = () => navigate({ to: "/test-cases" });
-	// Test-case entry (dev only): the test-cases screen imports this chat on arrival.
-	const showSaveAsTestCase = environment.testCaseEntryEnabled && messages.length > 0 && !showQuestionList;
-	const questionListToggle = hasConversation || showSaveAsTestCase ? (
-		<div className="mb-2 flex flex-wrap justify-center gap-2">
-			{hasConversation && <Button
+	const questionListToggle = hasConversation ? (
+		<div className="mb-2 flex justify-center">
+			<Button
 				type="button"
 				variant="outline"
 				disabled={isAssistantTyping}
@@ -72,19 +71,7 @@ function ChatLayout() {
 			>
 				{isOnQuestionList ? <MessagesSquare className="size-5" /> : <List className="size-5" />}
 				{(isOnQuestionList ? t("backToConversation") : t("seeMoreQuestions")) as string}
-			</Button>}
-			{showSaveAsTestCase && (
-				<Button
-					type="button"
-					variant="outline"
-					disabled={isAssistantTyping}
-					onClick={openTestCases}
-					className="min-h-[44px] gap-2 rounded-full border-[#019444] bg-white px-5 text-sm font-semibold text-[#017A38] cursor-pointer hover:bg-[#EEFFF4] hover:text-[#017A38]"
-				>
-					<ClipboardCheck className="size-5" />
-					Save as test case
-				</Button>
-			)}
+			</Button>
 		</div>
 	) : null;
 
@@ -142,10 +129,10 @@ function ChatLayout() {
 				}}
 				onBack={hasConversation && !showQuestionList ? openQuestionList : undefined}
 				backDisabled={isAssistantTyping}
-				showPersonaSelector={environment.doctorPersonaSelectorEnabled}
+				showPersonaSelector={flags.doctorPersonaSelector}
 				persona={persona}
 				onPersonaChange={setPersona}
-				onOpenTestCases={environment.testCaseEntryEnabled ? openTestCases : undefined}
+				onOpenTestCases={flags.testCaseEntry ? openTestCases : undefined}
 			/>
 
 			{/* Alert cards */}

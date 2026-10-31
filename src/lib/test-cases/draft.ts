@@ -1,9 +1,10 @@
 import type { ChatMessage } from "@/components/screens-component/chat-screen/components/bubbles/chat-types";
+import { OTHER_TAG_VALUE } from "./taxonomy";
 import type { TestCaseDraft, TestCaseIssue, TestCasePayload, TestCaseRole, TestCaseTurn } from "./types";
 
 export const MIN_DESCRIPTION_LENGTH = 20;
 // Counted in farmer questions (one question plus its answer is one exchange).
-export const MAX_EXCHANGES = 50;
+export const MAX_EXCHANGES = 20;
 // The agent caps its history around here, so longer chats drift anyway.
 export const LONG_CHAT_EXCHANGES = 15;
 
@@ -16,19 +17,31 @@ export function emptyDraft(source: TestCaseDraft["source"]): TestCaseDraft {
 		source,
 		turns: source === "manual" ? [createTurn("user"), createTurn("assistant")] : [],
 		description: "",
-		caseType: null,
-		tags: []
+		caseTypes: [],
+		tags: [],
+		otherTopic: ""
 	};
 }
 
+// Whether the bot answered the question at this index, before the next question.
+function gotAnswer(messages: ChatMessage[], index: number): boolean {
+	for (const message of messages.slice(index + 1)) {
+		if (message.type === "text" && message.role === "user") return false;
+		if (message.type === "card" && message.role === "assistant" && !message.isError) return true;
+	}
+	return false;
+}
+
 // Only what the farmer typed and what the bot answered become turns. Error cards
-// (rate limit, failed request) are app messages, not bot answers.
+// (rate limit, failed request) are app messages, not bot answers, and a question
+// that got no answer never reached the bot, so it is no test.
 export function turnsFromChat(messages: ChatMessage[]): TestCaseTurn[] {
 	const turns: TestCaseTurn[] = [];
-	for (const message of messages) {
+	for (const [index, message] of messages.entries()) {
 		let role: TestCaseRole | null = null;
 		let content = "";
 		if (message.type === "text" && message.role === "user") {
+			if (!gotAnswer(messages, index)) continue;
 			role = "user";
 			content = message.text;
 		} else if (message.type === "card" && message.role === "assistant" && !message.isError) {
@@ -36,7 +49,11 @@ export function turnsFromChat(messages: ChatMessage[]): TestCaseTurn[] {
 			content = message.body;
 		}
 		if (!role || !content.trim()) continue;
-		turns.push({ ...createTurn(role, content), originalContent: content });
+		turns.push({
+			...createTurn(role, content),
+			originalContent: content,
+			...(role === "assistant" && message.type === "card" && message.traceId ? { traceId: message.traceId } : {})
+		});
 	}
 	return turns;
 }
@@ -45,8 +62,12 @@ export function activeTurns(draft: TestCaseDraft): TestCaseTurn[] {
 	return draft.turns.filter((turn) => !turn.removed);
 }
 
+// Whitespace collapsed, so one stray Enter in a kept-wrong answer does not turn a
+// negative test into a corrected one.
+const collapse = (text: string): string => text.replace(/\s+/g, " ").trim();
+
 export function isTurnEdited(turn: TestCaseTurn): boolean {
-	return turn.originalContent !== undefined && turn.content.trim() !== turn.originalContent.trim();
+	return turn.originalContent !== undefined && collapse(turn.content) !== collapse(turn.originalContent);
 }
 
 // The role a newly added turn should take: the opposite of the last kept turn.
@@ -86,6 +107,14 @@ export function validateDraft(draft: TestCaseDraft): TestCaseIssue[] {
 		});
 	}
 
+	if (draft.source === "chat" && !draft.sessionId) {
+		issues.push({ level: "error", message: "This chat has no session id. Go back to the chat and import it again." });
+	}
+
+	if (draft.tags.includes(OTHER_TAG_VALUE) && !draft.otherTopic.trim()) {
+		issues.push({ level: "error", message: "You picked General / other. Write what the test case is about." });
+	}
+
 	const description = draft.description.trim();
 	if (!description) {
 		issues.push({ level: "error", message: "Describe what this test case checks." });
@@ -99,31 +128,40 @@ export function hasErrors(issues: TestCaseIssue[]): boolean {
 	return issues.some((issue) => issue.level === "error");
 }
 
-export function buildPayload(draft: TestCaseDraft, options: { bulkCaseId?: string } = {}): TestCasePayload {
+// Language of the text by its script, for bulk cases with no language cell. Null when
+// the script can't say: Devanagari can be Hindi or Marathi, and the other Indian
+// scripts are for a person to name. Only Latin text counts as English.
+export function detectLanguage(text: string): string | null {
+	if (/[\u0A80-\u0AFF]/.test(text)) return "gu";
+	if (/[\u0900-\u0D7F]/.test(text)) return null;
+	return "en";
+}
+
+export function buildPayload(
+	draft: TestCaseDraft,
+	options: { submittedBy: string; bulkCaseId?: string }
+): TestCasePayload {
 	const turns = activeTurns(draft);
+	const otherTopic = draft.otherTopic.trim();
 	return {
+		schema_version: 1,
 		source: draft.source,
+		submitted_by: options.submittedBy,
+		persona: draft.persona ?? "farmer",
+		language: draft.language ?? "en",
 		description: draft.description.trim(),
-		case_type: draft.caseType,
+		case_types: draft.caseTypes,
 		tags: draft.tags,
-		turns: turns.map((turn) => {
-			const edited = isTurnEdited(turn);
-			return {
-				role: turn.role,
-				content: turn.content.trim(),
-				edited,
-				...(edited ? { original_content: turn.originalContent } : {})
-			};
-		}),
-		metadata: {
-			session_id: draft.sessionId,
-			language: draft.language,
-			persona: draft.persona,
-			bulk_case_id: options.bulkCaseId,
-			turn_count: turns.length,
-			edited_turn_count: turns.filter(isTurnEdited).length,
-			removed_turn_count: draft.turns.length - turns.length,
-			submitted_at: new Date().toISOString()
-		}
+		...(draft.tags.includes(OTHER_TAG_VALUE) && otherTopic ? { other_topic: otherTopic } : {}),
+		turns: turns.map((turn) => ({
+			role: turn.role,
+			content: turn.content.trim(),
+			...(draft.source === "chat" && isTurnEdited(turn) ? { original_content: turn.originalContent?.trim() } : {}),
+			...(turn.role === "assistant" && draft.source === "chat" && turn.traceId ? { trace_id: turn.traceId } : {})
+		})),
+		...(draft.source === "chat" && draft.sessionId
+			? { chat: { session_id: draft.sessionId, removed_turn_count: draft.turns.filter((turn) => turn.removed && turn.originalContent !== undefined).length } }
+			: {}),
+		...(draft.source === "bulk" ? { bulk: { case_id: options.bulkCaseId ?? "" } } : {})
 	};
 }
