@@ -1,34 +1,45 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, AlertTriangle, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { activeTurns, buildPayload, hasErrors, isTurnEdited, validateDraft } from "@/lib/test-cases/draft";
-import { submitTestCase } from "@/lib/test-cases/api";
-import type { TestCaseDraft } from "@/lib/test-cases/types";
+import { submitTestCase, TestCaseApiError } from "@/lib/test-cases/api";
+import type { TestCaseDraft, TestCaseIssue } from "@/lib/test-cases/types";
 import { DetailsForm } from "./details-form";
 import { TurnEditor } from "./turn-editor";
 
 /* eslint-disable no-unused-vars */
 type DraftEditorProps = {
 	draft: TestCaseDraft;
+	// The tester picked above the tabs; sent as submitted_by.
+	submittedBy: string;
 	onChange: (update: (draft: TestCaseDraft) => TestCaseDraft) => void;
 	onSubmitted: () => void;
-	onSubmitFailed: () => void;
+	onSubmitFailed: (message: string) => void;
 	conversationActions?: React.ReactNode;
 };
 /* eslint-enable no-unused-vars */
 
-export function DraftEditor({ draft, onChange, onSubmitted, onSubmitFailed, conversationActions }: DraftEditorProps) {
+export function DraftEditor({ draft, submittedBy, onChange, onSubmitted, onSubmitFailed, conversationActions }: DraftEditorProps) {
 	// Errors stay quiet until the first submit so a half-written draft isn't red.
 	const [attempted, setAttempted] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
+	// What the server refused, shown next to the issues found here. Cleared by any edit.
+	const [serverIssues, setServerIssues] = useState<TestCaseIssue[]>([]);
 	const issuesRef = useRef<HTMLDivElement | null>(null);
+	useEffect(() => setServerIssues([]), [draft]);
 
-	const issues = useMemo(() => validateDraft(draft), [draft]);
+	const issues = useMemo<TestCaseIssue[]>(
+		() => [
+			...validateDraft(draft),
+			...(submittedBy ? [] : [{ level: "error" as const, message: "Choose your name in the Tester box at the top." }])
+		],
+		[draft, submittedBy]
+	);
 	const blocked = hasErrors(issues);
-	const shownIssues = attempted ? issues : issues.filter((issue) => issue.level === "warning");
+	const shownIssues = [...(attempted ? issues : issues.filter((issue) => issue.level === "warning")), ...serverIssues];
 	const errorTurnIds = useMemo(
-		() => new Set(attempted ? issues.flatMap((issue) => (issue.turnId ? [issue.turnId] : [])) : []),
-		[attempted, issues]
+		() => new Set([...(attempted ? issues : []), ...serverIssues].flatMap((issue) => (issue.turnId ? [issue.turnId] : []))),
+		[attempted, issues, serverIssues]
 	);
 
 	const turns = activeTurns(draft);
@@ -52,13 +63,26 @@ export function DraftEditor({ draft, onChange, onSubmitted, onSubmitFailed, conv
 			return;
 		}
 		setSubmitting(true);
+		setServerIssues([]);
 		try {
-			await submitTestCase(buildPayload(draft));
+			await submitTestCase(buildPayload(draft, { submittedBy }));
 			setAttempted(false);
 			onSubmitted();
 		} catch (error) {
 			console.error("Test case submission failed:", error);
-			onSubmitFailed();
+			if (error instanceof TestCaseApiError) {
+				const kept = activeTurns(draft);
+				setServerIssues(
+					error.fieldErrors.length > 0
+						? error.fieldErrors.map(({ loc, msg }) => {
+								// ["turns", 3, "content"]: the fourth turn that was sent.
+								const index = loc[0] === "turns" && typeof loc[1] === "number" ? loc[1] : -1;
+								return { level: "error" as const, message: msg, turnId: kept[index]?.id };
+							})
+						: [{ level: "error", message: error.message }]
+				);
+			}
+			onSubmitFailed(error instanceof TestCaseApiError ? error.message : "Couldn't submit the test case. Please try again.");
 		} finally {
 			setSubmitting(false);
 		}
@@ -84,7 +108,7 @@ export function DraftEditor({ draft, onChange, onSubmitted, onSubmitFailed, conv
 
 			<section className="flex flex-col gap-3">
 				<h2 className="text-base font-semibold text-gray-900">About this test case</h2>
-				<DetailsForm draft={draft} onChange={onChange} showDescriptionError={attempted} />
+				<DetailsForm draft={draft} onChange={onChange} showErrors={attempted} />
 			</section>
 
 			{shownIssues.length > 0 && (

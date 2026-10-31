@@ -1,11 +1,12 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { environment } from "@/lib/config/environment";
+import { loadUiFlags } from "@/lib/ui-flags";
 import TestCasesPage from ".";
 
 export const Route = createFileRoute("/_public-chat/test-cases")({
-	// Off on production builds; the path is also blocked at the proxy there.
-	beforeLoad: () => {
-		if (!environment.testCaseEntryEnabled) {
+	// Off unless the backend turns it on; the path is also blocked at the proxy on production.
+	beforeLoad: async () => {
+		const flags = await loadUiFlags();
+		if (!flags.testCaseEntry) {
 			throw redirect({ to: "/chat" });
 		}
 	},

@@ -21,7 +21,7 @@ export const routes = rootRoute("root.tsx", [
 			route("/chat", "app/(_chat)/chat-screen/routes.ts"),
 			route("/settings", "app/(_chat)/settings/routes.ts")
 		]),
-		// Test-case entry for the evaluation dataset, behind VITE_ENABLE_TEST_CASE_ENTRY.
+		// Test-case entry for the evaluation dataset, behind the test_case_entry flag from GET /api/ui-flags/.
 		route("/test-cases", "app/(_testing)/test-cases/routes.ts")
 	]),
 	// Protected area behind authentication

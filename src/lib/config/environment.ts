@@ -1,7 +1,3 @@
-export function parseBooleanFlag(value: unknown): boolean {
-  return typeof value === 'string' && ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
-}
-
 export const environment = {
   /**
    * API base URL. Set via VITE_API_BASE_URL (env / .env / Docker build-arg).
@@ -13,8 +9,4 @@ export const environment = {
   /** Provider identifiers for TTS and transcription services. */
   ttsProvider: (import.meta.env.VITE_TTS_PROVIDER as string) || 'bhashini',
   transcriptionProvider: (import.meta.env.VITE_TRANSCRIPTION_PROVIDER as string) || 'bhashini',
-  /** Exposes the test-only farmer/doctor selector in the chat header. */
-  doctorPersonaSelectorEnabled: parseBooleanFlag(import.meta.env.VITE_ENABLE_DOCTOR_PERSONA_SELECTOR),
-  /** Exposes the test-case entry screen (/test-cases) for dataset annotators. Dev only. */
-  testCaseEntryEnabled: parseBooleanFlag(import.meta.env.VITE_ENABLE_TEST_CASE_ENTRY),
 };

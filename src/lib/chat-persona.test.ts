@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { normalizeChatPersona, resolveChatPersona } from "./chat-persona";
-import { parseBooleanFlag } from "./config/environment";
 
 describe("chat persona", () => {
 	it("normalizes signed doctor claims and defaults unknown values to farmer", () => {
@@ -17,12 +16,5 @@ describe("chat persona", () => {
 		expect(resolveChatPersona("doctor", false)).toBe("farmer");
 		expect(resolveChatPersona("doctor", true)).toBe("doctor");
 		expect(resolveChatPersona(undefined, true)).toBe("farmer");
-	});
-
-	it("enables the selector only for explicit true-like values", () => {
-		expect(parseBooleanFlag("true")).toBe(true);
-		expect(parseBooleanFlag("1")).toBe(true);
-		expect(parseBooleanFlag("off")).toBe(false);
-		expect(parseBooleanFlag(undefined)).toBe(false);
 	});
 });
