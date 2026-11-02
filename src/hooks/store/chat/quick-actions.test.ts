@@ -4,9 +4,12 @@ import bnData from "../../../../translations/bn.json";
 import enData from "../../../../translations/en.json";
 import guData from "../../../../translations/gu.json";
 import hiData from "../../../../translations/hi.json";
+import mrData from "../../../../translations/mr.json";
+import paData from "../../../../translations/pa.json";
 import type { QuickAction } from ".";
 
-const BUNDLES: Record<string, any> = { en: enData, gu: guData, hi: hiData, bn: bnData };
+const BUNDLES: Record<string, any> = { en: enData, gu: guData, hi: hiData, bn: bnData, mr: mrData, pa: paData };
+const AI_MARKER: Record<string, string> = { mr: "रेतन", pa: "ਗਰਭਦਾਨ" };
 
 // Mirrors the i18n lookup the chat screen passes in: dotted keys, and the key
 // itself back when nothing defines it.
@@ -64,7 +67,8 @@ describe("welcome quick actions", () => {
 	it.each(Object.keys(BUNDLES))("puts the animal-details question second among the fixed cards, once (%s)", (lang) => {
 		const bundle = BUNDLES[lang];
 		const animalDetails = bundle.fixedQuestions[1];
-		expect(animalDetails).toContain("AI");
+		// mr and pa spell artificial insemination out instead of writing "AI".
+		expect(animalDetails).toContain(AI_MARKER[lang] ?? "AI");
 		expect(bundle.questions).toContain(animalDetails);
 
 		for (let i = 0; i < 20; i++) {
