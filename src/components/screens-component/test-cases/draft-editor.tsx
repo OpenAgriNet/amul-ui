@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, AlertTriangle, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { activeTurns, buildPayload, hasErrors, isTurnEdited, validateDraft } from "@/lib/test-cases/draft";
+import { activeTurns, buildPayload, hasErrors, isTurnEdited, pairsOf, validateDraft } from "@/lib/test-cases/draft";
 import { submitTestCase, TestCaseApiError } from "@/lib/test-cases/api";
 import type { TestCaseDraft, TestCaseIssue } from "@/lib/test-cases/types";
 import { DetailsForm } from "./details-form";
@@ -44,13 +44,13 @@ export function DraftEditor({ draft, submittedBy, onChange, onSubmitted, onSubmi
 
 	const turns = activeTurns(draft);
 	const questions = turns.filter((t) => t.role === "user").length;
-	const removed = draft.turns.length - turns.length;
+	const leftOut = pairsOf(draft.turns).filter((pair) => pair.turns[0]?.removed).length;
 	const edited = turns.filter(isTurnEdited).length;
 	const summary = [
 		`${questions} question${questions === 1 ? "" : "s"}`,
 		`${turns.length - questions} answer${turns.length - questions === 1 ? "" : "s"}`,
 		edited > 0 && `${edited} edited`,
-		removed > 0 && `${removed} removed`
+		leftOut > 0 && `${leftOut} left out`
 	]
 		.filter(Boolean)
 		.join(" · ");
@@ -100,8 +100,8 @@ export function DraftEditor({ draft, submittedBy, onChange, onSubmitted, onSubmi
 				</div>
 				<p className="text-sm text-gray-600">
 					{draft.source === "manual"
-						? "Type the conversation turn by turn: the farmer's question, then the answer the bot should give."
-						: "Fix any answer that is wrong so it reads the way the bot should reply, and remove turns that don't matter for this test."}
+						? "Write each turn as a farmer question and the answer the bot should give."
+						: "Fix any answer that is wrong so it reads the way the bot should reply. Untick the questions that don't matter for this test."}
 				</p>
 				<TurnEditor draft={draft} onChange={onChange} errorTurnIds={errorTurnIds} />
 			</section>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, MessagesSquare, PenLine, RefreshCw, Upload } from "lucide-react";
+import { ArrowLeft, MessagesSquare, PenLine, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,10 +29,13 @@ export function TestCasesScreen() {
 		submittedBy,
 		setSubmittedBy,
 		chatDraft,
+		chatDraftEdited,
 		manualDraft,
-		importChat,
+		syncChat,
+		loadChat,
+		chatSubmitted,
 		updateDraft,
-		resetDraft
+		resetManualDraft
 	} = useTestCaseStore();
 	const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 	const closeToast = useCallback(() => setToast(null), []);
@@ -57,30 +60,22 @@ export function TestCasesScreen() {
 	const testers = options?.testers ?? [];
 	// A saved tester who is no longer on the list has to choose again.
 	const testerId = testers.some((tester) => tester.id === submittedBy) ? submittedBy : "";
-	const importCurrentChat = () => importChat(messages, { sessionId, language, persona });
-
-	// Coming from the clipboard icon in the chat: import that chat unless this
-	// session's draft is already here (it may hold edits).
+	// The chat draft follows the chat: new messages join it and keep the edits made.
+	// A new draft takes the app language; an existing one keeps its own.
+	const chatMeta = () => ({ sessionId, language, persona });
 	useEffect(() => {
-		const { chatDraft: draft } = useTestCaseStore.getState();
-		if (chatTurnCount > 0 && (!draft || draft.sessionId !== (sessionId ?? undefined))) {
-			importChat(useChatStore.getState().messages, { sessionId, language, persona });
-		}
-		// Only on arrival; later chat changes are offered through "Re-import".
-	}, []);
+		syncChat(messages, { sessionId, language, persona });
+	}, [messages, sessionId, language, persona, syncChat]);
 
-	const chatHasNewTurns =
-		chatDraft !== null &&
-		chatDraft.sessionId === (sessionId ?? undefined) &&
-		chatTurnCount > chatDraft.turns.length;
-
-	const reimport = () => {
-		if (window.confirm("Replace this draft with the current chat? Your edits here will be lost."))
-			importCurrentChat();
-	};
+	// A newer chat is open but the draft holds edits from the earlier one, so it wasn't
+	// replaced. (An unedited draft is replaced right away and needs no notice.) The
+	// button shows once the new chat has an answered question to load.
+	const draftFromOtherChat =
+		chatDraft !== null && chatDraftEdited && chatDraft.sessionId !== (sessionId ?? undefined);
 
 	const onSubmitted = (kind: "chat" | "manual") => () => {
-		resetDraft(kind);
+		if (kind === "chat") chatSubmitted(messages, chatMeta());
+		else resetManualDraft();
 		setToast({ message: "Test case submitted. Thank you!", type: "success" });
 	};
 	const onSubmitFailed = (message: string) => setToast({ message, type: "error" });
@@ -178,7 +173,30 @@ export function TestCasesScreen() {
 									/>
 								</div>
 								<TabsContent value="chat">
-									{chatDraft && chatDraft.turns.length > 0 ? (
+									{draftFromOtherChat && (
+										<div
+											role="status"
+											className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+										>
+											<p className="min-w-0 flex-1">
+												{chatTurnCount > 0
+													? "You started a new chat. This draft is from the earlier one and has your edits."
+													: "You started a new chat. This draft is still from the earlier one. Once the new chat has an answer, you can load it here."}
+											</p>
+											{chatTurnCount > 0 && (
+												<Button
+													type="button"
+													variant="outline"
+													size="sm"
+													onClick={() => loadChat(messages, chatMeta())}
+													className="min-h-9 rounded-full border-amber-300 bg-white text-amber-900 hover:bg-amber-100 hover:text-amber-950"
+												>
+													Load the new chat
+												</Button>
+											)}
+										</div>
+									)}
+									{chatDraft ? (
 										<DraftEditor
 											key={chatDraft.sessionId ?? "chat"}
 											draft={chatDraft}
@@ -186,69 +204,34 @@ export function TestCasesScreen() {
 											onChange={(update) => updateDraft("chat", update)}
 											onSubmitted={onSubmitted("chat")}
 											onSubmitFailed={onSubmitFailed}
-											conversationActions={
-												chatHasNewTurns || chatDraft.sessionId !== (sessionId ?? undefined) ? (
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														onClick={reimport}
-														className="text-[#F65151] hover:bg-[#FFE2E2] hover:text-[#D93B3B]"
-													>
-														<RefreshCw className="size-4" />
-														{chatHasNewTurns
-															? "Chat has new messages: re-import"
-															: "Import current chat"}
-													</Button>
-												) : null
-											}
 										/>
 									) : (
 										<div className="flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white px-6 py-10 text-center shadow-sm">
 											<MessagesSquare className="size-10 text-[#F65151]" />
-											{chatTurnCount > 0 ? (
-												<>
-													<p className="text-base font-semibold text-gray-900">
-														Turn your current chat into a test case
-													</p>
-													<p className="max-w-md text-sm text-gray-600">
-														Review every message, fix wrong answers, remove what doesn't matter,
-														then describe what it tests.
-													</p>
+											<>
+												<p className="text-base font-semibold text-gray-900">No chat yet</p>
+												<p className="max-w-md text-sm text-gray-600">
+													Chat with Amul AI first, then open this screen again from the clipboard
+													icon at the top of the chat. Or write the conversation by hand.
+												</p>
+												<div className="flex flex-wrap justify-center gap-2">
 													<Button
 														type="button"
-														onClick={importCurrentChat}
+														onClick={() => navigate({ to: "/chat" })}
 														className="min-h-11 rounded-full bg-[#F65151] px-6 text-white hover:bg-[#D93B3B]"
 													>
-														Use current chat ({chatTurnCount} messages)
+														Go to chat
 													</Button>
-												</>
-											) : (
-												<>
-													<p className="text-base font-semibold text-gray-900">No chat yet</p>
-													<p className="max-w-md text-sm text-gray-600">
-														Chat with Amul AI first, then open this screen again from the clipboard
-														icon at the top of the chat. Or write the conversation by hand.
-													</p>
-													<div className="flex flex-wrap justify-center gap-2">
-														<Button
-															type="button"
-															onClick={() => navigate({ to: "/chat" })}
-															className="min-h-11 rounded-full bg-[#F65151] px-6 text-white hover:bg-[#D93B3B]"
-														>
-															Go to chat
-														</Button>
-														<Button
-															type="button"
-															variant="outline"
-															onClick={() => setTab("manual")}
-															className="min-h-11 rounded-full border-[#F65151] bg-white px-6 text-[#F65151] hover:bg-[#FFE2E2] hover:text-[#D93B3B]"
-														>
-															Write by hand
-														</Button>
-													</div>
-												</>
-											)}
+													<Button
+														type="button"
+														variant="outline"
+														onClick={() => setTab("manual")}
+														className="min-h-11 rounded-full border-[#F65151] bg-white px-6 text-[#F65151] hover:bg-[#FFE2E2] hover:text-[#D93B3B]"
+													>
+														Write by hand
+													</Button>
+												</div>
+											</>
 										</div>
 									)}
 								</TabsContent>

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChatMessage } from "@/components/screens-component/chat-screen/components/bubbles/chat-types";
-import { buildTemplateCsv, parseBulkCsv, parseBulkRows, parseCsv } from "./csv";
-import { buildPayload, detectLanguage, emptyDraft, hasErrors, MAX_EXCHANGES, nextRole, turnsFromChat, validateDraft } from "./draft";
+import { exampleRows, parseBulkCsv, parseBulkRows, parseCsv } from "./csv";
+import { buildPayload, detectLanguage, emptyDraft, hasErrors, MAX_EXCHANGES, mergeChatTurns, pairsOf, turnsFromChat, validateDraft } from "./draft";
 import { TEST_OPTIONS } from "./test-fixtures";
 import { templateSheetData } from "./xlsx";
 import type { TestCaseDraft } from "./types";
@@ -86,6 +86,61 @@ describe("test case drafts", () => {
 		}
 	});
 
+	it("checks the backend's pair rule, allowing answers in a row only in a chat", () => {
+		const turn = (id: string, role: "user" | "assistant") => ({ id, role, content: id });
+		const base = { ...emptyDraft("manual"), description: "A case about the pair rule." };
+		const messages = (turns: ReturnType<typeof turn>[], source: "manual" | "chat" = "manual") =>
+			validateDraft({ ...base, source, sessionId: "s1", turns }).map((i) => i.message);
+		expect(messages([turn("q1", "user"), turn("q2", "user"), turn("a2", "assistant")])).toContain(
+			"A farmer question has no answer. Add its answer or leave it out."
+		);
+		expect(messages([turn("q1", "user"), turn("a1", "assistant"), turn("q2", "user")])).toContain(
+			"The conversation has to end with a bot answer."
+		);
+		const twoAnswers = [turn("q1", "user"), turn("a1", "assistant"), turn("a2", "assistant")];
+		expect(messages(twoAnswers)).toContain("Two answers in a row. Give each question one answer.");
+		expect(messages(twoAnswers, "chat")).toEqual([]);
+		expect(pairsOf(twoAnswers).map((p) => p.turns.map((t) => t.id))).toEqual([["q1", "a1", "a2"]]);
+	});
+
+	it("takes new chat messages in without losing edits, and leaves out pairs already sent", () => {
+		const chat = (id: string, role: "user" | "assistant", content: string) => ({
+			id: `t-${id}-${content}`,
+			role,
+			content,
+			originalContent: content,
+			messageId: id
+		});
+		const draft = [
+			{ ...chat("m1", "user", "Dose?"), removed: true },
+			{ ...chat("m2", "assistant", "Give 50 ml."), removed: true },
+			{ ...chat("m3", "user", "And for a cow?"), content: "And for a cow? (edited)" },
+			chat("m4", "assistant", "Give")
+		];
+		const fresh = [
+			chat("m1", "user", "Dose?"),
+			chat("m2", "assistant", "Give 50 ml."),
+			chat("m3", "user", "And for a cow?"),
+			chat("m4", "assistant", "Give 100 ml."),
+			chat("m5", "assistant", "Call the vet."),
+			chat("m6", "user", "Thanks"),
+			chat("m7", "assistant", "Welcome")
+		];
+		const merged = mergeChatTurns(draft, fresh, new Set(["m6"]));
+		expect(merged.map((t) => [t.messageId, t.content, Boolean(t.removed)])).toEqual([
+			["m1", "Dose?", true],
+			["m2", "Give 50 ml.", true],
+			["m3", "And for a cow? (edited)", false],
+			["m4", "Give 100 ml.", false],
+			["m5", "Call the vet.", false],
+			["m6", "Thanks", true],
+			["m7", "Welcome", true]
+		]);
+		// A pair left out keeps new answers left out too.
+		const intoLeftOut = mergeChatTurns(merged, [...fresh, chat("m8", "assistant", "More")], new Set());
+		expect(intoLeftOut.at(-1)?.removed).toBe(true);
+	});
+
 	it("requires a description and a conversation that starts with the farmer", () => {
 		const draft: TestCaseDraft = {
 			...emptyDraft("chat"),
@@ -108,17 +163,17 @@ describe("test case drafts", () => {
 			turns: [
 				{ id: "1", role: "user", content: "Dose for a calf?", originalContent: "Dose for a calf?" },
 				{ id: "2", role: "assistant", content: "Give 5 ml.", originalContent: "Give 50 ml." },
-				{ id: "3", role: "user", content: "Thanks", originalContent: "Thanks", removed: true }
+				{ id: "3", role: "user", content: "Thanks", originalContent: "Thanks", removed: true },
+				{ id: "4", role: "assistant", content: "You're welcome.", originalContent: "You're welcome.", removed: true }
 			]
 		};
 		expect(hasErrors(validateDraft(draft))).toBe(false);
-		expect(nextRole(draft)).toBe("user");
 		const payload = buildPayload(draft, { submittedBy: "Vishal" });
 		expect(payload.turns).toEqual([
 			{ role: "user", content: "Dose for a calf?" },
 			{ role: "assistant", content: "Give 5 ml.", original_content: "Give 50 ml." }
 		]);
-		expect(payload.chat).toEqual({ session_id: "s1", removed_turn_count: 1 });
+		expect(payload.chat).toEqual({ session_id: "s1", removed_turn_count: 2 });
 		expect(payload).not.toHaveProperty("bulk");
 	});
 
@@ -203,11 +258,11 @@ describe("bulk CSV", () => {
 		]);
 	});
 
-	it("reads the template back as two valid cases", () => {
-		const { cases, fileError } = parseBulkCsv(buildTemplateCsv(TEST_OPTIONS), TEST_OPTIONS);
+	it("keeps the template examples valid, on their own sheet", () => {
+		const { cases, fileError } = parseBulkRows(exampleRows(TEST_OPTIONS), TEST_OPTIONS);
 		expect(fileError).toBeUndefined();
 		expect(cases.map((c) => [c.caseId, c.draft.turns.length, c.draft.tags, c.draft.caseTypes])).toEqual([
-			["1", 2, ["veterinary_advisory"], ["should_not_happen"]],
+			["1", 2, ["veterinary_advisory"], ["wrong_answer"]],
 			["2", 4, ["milk_earnings"], ["edge_case", "new_flow"]]
 		]);
 		expect(cases.every((c) => !hasErrors(c.issues))).toBe(true);
@@ -219,15 +274,21 @@ describe("bulk CSV", () => {
 			"7,farmer,Is it going to rain?,Weather question for the farmer's village,Weather",
 			",bot,Light rain tomorrow.,,",
 			",robot,???,,",
-			",user,,,"
+			",user,,,",
+			",user,Will it rain more?,,",
+			",user,Should I cover the fodder?,,",
+			",bot,Yes cover it.,,",
+			",bot,And keep it dry.,,"
 		].join("\n");
 		const bulkCase = parseBulkCsv(csv, TEST_OPTIONS).cases[0]!;
 		expect(bulkCase.caseId).toBe("7");
-		expect(bulkCase.draft.turns).toHaveLength(2);
+		expect(bulkCase.draft.turns).toHaveLength(6);
 		expect(bulkCase.draft.tags).toEqual(["weather"]);
 		expect(bulkCase.issues.map((i) => i.message)).toEqual([
 			'Row 4: role "robot" should be user or assistant.',
-			"Row 5: content is empty."
+			"Row 5: content is empty.",
+			"Row 6: A farmer question has no answer. Add its answer or leave it out.",
+			"Row 9: Two answers in a row. Give each question one answer."
 		]);
 	});
 
@@ -261,8 +322,14 @@ describe("bulk CSV", () => {
 	});
 
 	it("makes every template cell a text cell, with blank rows to fill in", () => {
-		const sheet = templateSheetData(TEST_OPTIONS);
+		const sheet = templateSheetData();
 		expect(sheet.length).toBeGreaterThan(500);
+		// Only the header: the examples are on their own sheet, so they can't merge into
+		// a tester's case 1.
+		expect(sheet.slice(1).flat().every((cell) => cell.value === "")).toBe(true);
+		// Uploading it untouched says where the cases go.
+		const blank = parseBulkRows(sheet.map((row) => row.map((cell) => cell.value)), TEST_OPTIONS);
+		expect(blank.fileError).toMatch(/Write your cases on the "Test cases" sheet/);
 		expect(sheet.flat().every((cell) => cell.format === "@")).toBe(true);
 		expect(sheet.every((row) => row.length === sheet[0]?.length)).toBe(true);
 	});

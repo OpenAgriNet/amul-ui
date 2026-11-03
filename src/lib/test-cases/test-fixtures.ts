@@ -23,11 +23,6 @@ const CASE_TYPES: TestCaseOption[] = [
 		value: "good_answer",
 		label: "Good answer to keep",
 		hint: "The bot got it right and must keep getting it right."
-	},
-	{
-		value: "should_not_happen",
-		label: "Must never happen",
-		hint: "Advice or behaviour the bot must avoid, e.g. a medicine that is unsafe in this situation."
 	}
 ];
 

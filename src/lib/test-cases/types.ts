@@ -13,6 +13,10 @@ export type TestCaseTurn = {
 	originalContent?: string;
 	// X-Trace-Id of the chat response that produced this answer (assistant turns of chat cases).
 	traceId?: string;
+	// Id of the chat message this turn came from, so a draft can take in new messages
+	// without losing the edits made to the ones already there.
+	messageId?: string;
+	// Left out of the case. Chat turns stay in the draft so they still count.
 	removed?: boolean;
 };
 

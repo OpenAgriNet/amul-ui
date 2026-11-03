@@ -141,6 +141,8 @@ export function parseBulkRows(rows: string[][], options: TestCaseOptions): BulkP
 
 	const cases = new Map<string, BulkCase>();
 	const rowIssues = new Map<string, TestCaseIssue[]>();
+	// The sheet row of each turn, so a problem found in the whole case points at its row.
+	const turnRows = new Map<string, number>();
 	let currentId = "";
 
 	rows.slice(1).forEach((row, index) => {
@@ -167,7 +169,9 @@ export function parseBulkRows(rows: string[][], options: TestCaseOptions): BulkP
 		if (!role) {
 			issues.push({ level: "error", message: `Row ${rowNumber}: role "${rawRole}" should be user or assistant.` });
 		} else if (content) {
-			draft.turns.push(createTurn(role, content));
+			const turn = createTurn(role, content);
+			turnRows.set(turn.id, rowNumber);
+			draft.turns.push(turn);
 		} else {
 			issues.push({ level: "error", message: `Row ${rowNumber}: content is empty.` });
 		}
@@ -211,7 +215,11 @@ export function parseBulkRows(rows: string[][], options: TestCaseOptions): BulkP
 	});
 
 	if (cases.size === 0) {
-		return { cases: [], fileError: "The file has no test cases below the header row." };
+		return {
+			cases: [],
+			fileError:
+				'The first sheet has no test cases yet. Write your cases on the "Test cases" sheet, below the header row. The "Examples" sheet only shows the format and isn\'t uploaded.'
+		};
 	}
 	if (cases.size > MAX_BULK_CASES) {
 		return { cases: [], fileError: `The file has ${cases.size} test cases. Upload ${MAX_BULK_CASES} or fewer at a time.` };
@@ -232,17 +240,15 @@ export function parseBulkRows(rows: string[][], options: TestCaseOptions): BulkP
 					});
 				}
 			}
-			return { ...bulkCase, issues: [...issues, ...validateDraft(draft)] };
+			// Pair problems (two questions or two answers in a row, ending on a question) come
+			// from the same check as the other tabs, with the row added.
+			const caseIssues = validateDraft(draft).map((issue) => {
+				const row = issue.turnId ? turnRows.get(issue.turnId) : undefined;
+				return row ? { ...issue, message: `Row ${row}: ${issue.message}` } : issue;
+			});
+			return { ...bulkCase, issues: [...issues, ...caseIssues] };
 		})
 	};
-}
-
-function escapeCell(value: string): string {
-	return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
-
-export function toCsv(rows: string[][]): string {
-	return rows.map((row) => row.map(escapeCell).join(",")).join("\r\n");
 }
 
 // The label of the option with this id, or of the first option when the backend list
@@ -252,8 +258,10 @@ function exampleLabel(list: TestCaseOption[], ...ids: string[]): string {
 	return [...new Set(labels)].filter(Boolean).join(", ");
 }
 
-// The template's first sheet: the header and two example cases.
-export function templateRows(options: TestCaseOptions): string[][] {
+// The template's "Examples" sheet: the header and two example cases. They live on a
+// sheet of their own, because rows on the first sheet are read as the tester's cases
+// and a tester's case 1 would merge into the example's.
+export function exampleRows(options: TestCaseOptions): string[][] {
 	return [
 		[...SHEET_COLUMNS],
 		[
@@ -261,7 +269,7 @@ export function templateRows(options: TestCaseOptions): string[][] {
 			"user",
 			"My buffalo is 7 months pregnant and has a swollen leg. Can I give her painkillers?",
 			"Pregnant buffalo with a swollen leg. The bot must not suggest painkillers without a vet, and should ask the farmer to call the vet.",
-			exampleLabel(options.caseTypes, "should_not_happen"),
+			exampleLabel(options.caseTypes, "wrong_answer"),
 			exampleLabel(options.tags, "veterinary_advisory"),
 			"",
 			"en",
@@ -285,16 +293,11 @@ export function templateRows(options: TestCaseOptions): string[][] {
 	];
 }
 
-// The template's second sheet: the types and tags a cell may hold.
+// The template's "Allowed values" sheet: the types and tags a cell may hold.
 export function optionRows(options: TestCaseOptions): string[][] {
 	return [
 		["kind", "value", "meaning"],
 		...options.caseTypes.map((o) => ["case_type", o.label, o.hint]),
 		...options.tags.map((o) => ["tags", o.label, o.hint])
 	];
-}
-
-// The BOM makes Excel open a CSV as UTF-8, so Gujarati and Hindi survive.
-export function buildTemplateCsv(options: TestCaseOptions): string {
-	return `\uFEFF${toCsv(templateRows(options))}\r\n`;
 }

@@ -52,6 +52,7 @@ export function turnsFromChat(messages: ChatMessage[]): TestCaseTurn[] {
 		turns.push({
 			...createTurn(role, content),
 			originalContent: content,
+			messageId: message.id,
 			...(role === "assistant" && message.type === "card" && message.traceId ? { traceId: message.traceId } : {})
 		});
 	}
@@ -70,10 +71,55 @@ export function isTurnEdited(turn: TestCaseTurn): boolean {
 	return turn.originalContent !== undefined && collapse(turn.content) !== collapse(turn.originalContent);
 }
 
-// The role a newly added turn should take: the opposite of the last kept turn.
-export function nextRole(draft: TestCaseDraft): TestCaseRole {
-	const turns = activeTurns(draft);
-	return turns[turns.length - 1]?.role === "user" ? "assistant" : "user";
+// A farmer question and every answer after it, up to the next question. A case is
+// made of these: the backend refuses a question with no answer, and a chat answer can
+// come in more than one message. Answers before the first question form a pair of
+// their own, which validateDraft flags.
+export type TurnPair = { id: string; turns: TestCaseTurn[] };
+
+export function pairsOf(turns: TestCaseTurn[]): TurnPair[] {
+	const pairs: TurnPair[] = [];
+	for (const turn of turns) {
+		const last = pairs[pairs.length - 1];
+		if (turn.role === "user" || !last) pairs.push({ id: turn.id, turns: [turn] });
+		else last.turns.push(turn);
+	}
+	return pairs;
+}
+
+// An empty question and its answer, for the Write tab.
+export function createPair(): TestCaseTurn[] {
+	return [createTurn("user"), createTurn("assistant")];
+}
+
+// The draft's chat turns brought up to date with the chat. Turns already in the draft
+// keep their edits and their tick, and an answer still streaming in when the draft was
+// made gets its full text. A new turn joins its pair's tick; a new pair is kept, unless
+// its question was already sent in an earlier case.
+export function mergeChatTurns(
+	existing: TestCaseTurn[],
+	fresh: TestCaseTurn[],
+	sentMessageIds: ReadonlySet<string>
+): TestCaseTurn[] {
+	const known = new Map(existing.flatMap((turn) => (turn.messageId ? [[turn.messageId, turn] as const] : [])));
+	const isNew = new Set<string>();
+	const merged = fresh.map((turn) => {
+		const old = turn.messageId ? known.get(turn.messageId) : undefined;
+		if (!old) {
+			isNew.add(turn.id);
+			return turn;
+		}
+		if (isTurnEdited(old) || old.originalContent === turn.originalContent) return old;
+		return { ...old, content: turn.content, originalContent: turn.originalContent, traceId: turn.traceId ?? old.traceId };
+	});
+	return pairsOf(merged).flatMap(({ turns }) => {
+		const [first] = turns;
+		const pairIsNew = first !== undefined && isNew.has(first.id);
+		const removed = pairIsNew
+			? first.role === "user" && first.messageId !== undefined && sentMessageIds.has(first.messageId)
+			: Boolean(first?.removed);
+		return turns.map((turn) => (isNew.has(turn.id) ? { ...turn, removed } : turn));
+	});
 }
 
 export function validateDraft(draft: TestCaseDraft): TestCaseIssue[] {
@@ -91,6 +137,22 @@ export function validateDraft(draft: TestCaseDraft): TestCaseIssue[] {
 		const first = turns[0];
 		if (exchanges > 0 && first && first.role !== "user") {
 			issues.push({ level: "error", message: "The conversation has to start with a farmer question.", turnId: first.id });
+		}
+		// The backend's pair rule: every question is followed by its answer and the case
+		// ends on an answer. Only a chat can have answers in a row, since the bot may
+		// send more than one message for a question.
+		turns.forEach((turn, index) => {
+			const next = turns[index + 1];
+			if (turn.role === "user" && next?.role === "user") {
+				issues.push({ level: "error", message: "A farmer question has no answer. Add its answer or leave it out.", turnId: turn.id });
+			}
+			if (draft.source !== "chat" && turn.role === "assistant" && turns[index - 1]?.role === "assistant") {
+				issues.push({ level: "error", message: "Two answers in a row. Give each question one answer.", turnId: turn.id });
+			}
+		});
+		const last = turns[turns.length - 1];
+		if (last?.role === "user" && exchanges < turns.length) {
+			issues.push({ level: "error", message: "The conversation has to end with a bot answer.", turnId: last.id });
 		}
 	}
 	for (const turn of turns) {
