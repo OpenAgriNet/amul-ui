@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, MessagesSquare, PenLine, Upload } from "lucide-react";
+import { ArrowLeft, Library, MessagesSquare, PenLine, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,11 +11,13 @@ import { useTestCaseStore, type TestCaseTab } from "@/hooks/store/test-cases";
 import { turnsFromChat } from "@/lib/test-cases/draft";
 import { useTestCaseOptions } from "@/hooks/store/test-cases/options";
 import { BulkUpload } from "./bulk-upload";
+import { DatasetView } from "./dataset-view";
 import { DraftEditor } from "./draft-editor";
 import { FieldSelect } from "./field-select";
 
+// Four tabs don't fit a phone with their icons, so the icons show from tablet width up.
 const TAB_TRIGGER_CLASS =
-	"min-h-10 flex-1 gap-1.5 rounded-full text-sm data-[state=active]:bg-white data-[state=active]:text-[#C53030] data-[state=active]:shadow-sm";
+	"min-h-10 flex-1 gap-1.5 rounded-full px-1 text-sm data-[state=active]:bg-white data-[state=active]:text-[#C53030] data-[state=active]:shadow-sm max-sm:[&_svg]:hidden sm:px-2";
 
 export function TestCasesScreen() {
 	const navigate = useNavigate();
@@ -126,6 +128,10 @@ export function TestCasesScreen() {
 								<Upload className="size-4" />
 								Bulk upload
 							</TabsTrigger>
+							<TabsTrigger value="dataset" className={TAB_TRIGGER_CLASS}>
+								<Library className="size-4" />
+								Dataset
+							</TabsTrigger>
 						</TabsList>
 					</div>
 				</div>
@@ -156,22 +162,25 @@ export function TestCasesScreen() {
 							</div>
 						) : (
 							<>
-								<div className="mb-4 flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-									<Label
-										htmlFor="test-case-tester"
-										className="shrink-0 text-sm font-semibold text-gray-900"
-									>
-										Tester <span className="text-[#F65151]">*</span>
-									</Label>
-									<FieldSelect
-										id="test-case-tester"
-										value={testerId}
-										onValueChange={setSubmittedBy}
-										options={testers.map((tester) => ({ value: tester.id, label: tester.label }))}
-										placeholder="Choose your name"
-										className="flex-1"
-									/>
-								</div>
+								{/* The dataset view only reads, so it needs no tester. */}
+								{tab !== "dataset" && (
+									<div className="mb-4 flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+										<Label
+											htmlFor="test-case-tester"
+											className="shrink-0 text-sm font-semibold text-gray-900"
+										>
+											Tester <span className="text-[#F65151]">*</span>
+										</Label>
+										<FieldSelect
+											id="test-case-tester"
+											value={testerId}
+											onValueChange={setSubmittedBy}
+											options={testers.map((tester) => ({ value: tester.id, label: tester.label }))}
+											placeholder="Choose your name"
+											className="flex-1"
+										/>
+									</div>
+								)}
 								<TabsContent value="chat">
 									{draftFromOtherChat && (
 										<div
@@ -267,6 +276,10 @@ export function TestCasesScreen() {
 											)
 										}
 									/>
+								</TabsContent>
+
+								<TabsContent value="dataset">
+									<DatasetView options={options} />
 								</TabsContent>
 							</>
 						)}
