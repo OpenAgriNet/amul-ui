@@ -41,12 +41,14 @@ const LANGUAGE_OPTIONS: TestCaseOption[] = Object.values(LANGUAGES).map(({ code,
 }));
 
 type SelectKey = Exclude<keyof DatasetFilters, "q" | "question">;
+/* eslint-disable no-unused-vars */
 type Column = {
 	key: string;
 	title: string;
 	className?: string;
 	// The column's filter; Question has a text box instead.
 	filter?: { key: SelectKey; choices: Array<{ value: string; label: string }> };
+/* eslint-enable no-unused-vars */
 	cell: (row: DatasetRow) => React.ReactNode;
 };
 
