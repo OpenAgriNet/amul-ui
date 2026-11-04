@@ -15,11 +15,10 @@ type DraftEditorProps = {
 	onChange: (update: (draft: TestCaseDraft) => TestCaseDraft) => void;
 	onSubmitted: () => void;
 	onSubmitFailed: (message: string) => void;
-	conversationActions?: React.ReactNode;
 };
 /* eslint-enable no-unused-vars */
 
-export function DraftEditor({ draft, submittedBy, onChange, onSubmitted, onSubmitFailed, conversationActions }: DraftEditorProps) {
+export function DraftEditor({ draft, submittedBy, onChange, onSubmitted, onSubmitFailed }: DraftEditorProps) {
 	// Errors stay quiet until the first submit so a half-written draft isn't red.
 	const [attempted, setAttempted] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
@@ -91,12 +90,9 @@ export function DraftEditor({ draft, submittedBy, onChange, onSubmitted, onSubmi
 	return (
 		<div className="flex flex-col gap-6">
 			<section className="flex flex-col gap-3">
-				<div className="flex flex-wrap items-end justify-between gap-2">
-					<div>
-						<h2 className="text-base font-semibold text-gray-900">Conversation</h2>
-						<p className="text-sm text-gray-500">{summary}</p>
-					</div>
-					{conversationActions}
+				<div>
+					<h2 className="text-base font-semibold text-gray-900">Conversation</h2>
+					<p className="text-sm text-gray-500">{summary}</p>
 				</div>
 				<p className="text-sm text-gray-600">
 					{draft.source === "manual"

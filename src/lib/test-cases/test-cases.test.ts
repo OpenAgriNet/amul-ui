@@ -136,6 +136,14 @@ describe("test case drafts", () => {
 			["m6", "Thanks", true],
 			["m7", "Welcome", true]
 		]);
+		// A tester who edits an answer while it is still coming in keeps the edit, and the
+		// original becomes the full answer, not the half one.
+		const editedEarly = mergeChatTurns(
+			[chat("m1", "user", "Dose?"), { ...chat("m2", "assistant", "Give"), content: "Call the vet." }],
+			[chat("m1", "user", "Dose?"), chat("m2", "assistant", "Give 50 ml.")],
+			new Set()
+		);
+		expect(editedEarly[1]).toMatchObject({ content: "Call the vet.", originalContent: "Give 50 ml." });
 		// A pair left out keeps new answers left out too.
 		const intoLeftOut = mergeChatTurns(merged, [...fresh, chat("m8", "assistant", "More")], new Set());
 		expect(intoLeftOut.at(-1)?.removed).toBe(true);

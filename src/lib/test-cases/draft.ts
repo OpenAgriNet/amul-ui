@@ -94,7 +94,8 @@ export function createPair(): TestCaseTurn[] {
 
 // The draft's chat turns brought up to date with the chat. Turns already in the draft
 // keep their edits and their tick, and an answer still streaming in when the draft was
-// made gets its full text. A new turn joins its pair's tick; a new pair is kept, unless
+// made gets its full text: as the turn itself when it wasn't edited, and as the
+// original either way, so original_content is what the bot finally said. A new turn joins its pair's tick; a new pair is kept, unless
 // its question was already sent in an earlier case.
 export function mergeChatTurns(
 	existing: TestCaseTurn[],
@@ -109,8 +110,13 @@ export function mergeChatTurns(
 			isNew.add(turn.id);
 			return turn;
 		}
-		if (isTurnEdited(old) || old.originalContent === turn.originalContent) return old;
-		return { ...old, content: turn.content, originalContent: turn.originalContent, traceId: turn.traceId ?? old.traceId };
+		if (old.originalContent === turn.originalContent) return old;
+		return {
+			...old,
+			content: isTurnEdited(old) ? old.content : turn.content,
+			originalContent: turn.originalContent,
+			traceId: turn.traceId ?? old.traceId
+		};
 	});
 	return pairsOf(merged).flatMap(({ turns }) => {
 		const [first] = turns;
