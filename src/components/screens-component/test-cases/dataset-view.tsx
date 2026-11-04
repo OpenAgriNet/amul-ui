@@ -20,6 +20,8 @@ import { FieldSelect } from "./field-select";
 // Radix Select can't hold an empty value, so "no filter" has a value of its own.
 const ANY = "any";
 const SEARCH_DELAY_MS = 300;
+// The list route answers 422 to a longer search.
+const MAX_SEARCH_LENGTH = 200;
 
 const SOURCE_LABELS: Record<string, string> = {
 	chat: "From chat",
@@ -36,7 +38,8 @@ const toOptions = (labels: Record<string, string>) => [
 	...Object.entries(labels).map(([value, label]) => ({ value, label }))
 ];
 
-type Load = { status: "loading" | "ready" | "error"; error?: string };
+// page: the page being loaded, so Try again asks for the same one.
+type Load = { status: "loading" | "ready" | "error"; error?: string; page?: number };
 
 const errorText = (error: unknown) =>
 	error instanceof Error ? error.message : "Something went wrong. Try again.";
@@ -234,9 +237,15 @@ export function DatasetView({ options }: { options: TestCaseOptions }) {
 			.catch((error: unknown) => setCoverageLoad({ status: "error", error: errorText(error) }));
 	};
 
+	// Page 1 is a new list (new filters, or the first load): the old cases go at once, so
+	// a later page can't land under cases from other filters. Other pages add to it.
 	const loadPage = (nextPage: number) => {
 		const request = ++requestRef.current;
-		setListLoad({ status: "loading" });
+		if (nextPage === 1) {
+			setItems([]);
+			setTotal(0);
+		}
+		setListLoad({ status: "loading", page: nextPage });
 		fetchDatasetPage(filters, nextPage)
 			.then((result) => {
 				if (request !== requestRef.current) return;
@@ -247,7 +256,7 @@ export function DatasetView({ options }: { options: TestCaseOptions }) {
 			})
 			.catch((error: unknown) => {
 				if (request === requestRef.current)
-					setListLoad({ status: "error", error: errorText(error) });
+					setListLoad({ status: "error", error: errorText(error), page: nextPage });
 			});
 	};
 
@@ -347,6 +356,7 @@ export function DatasetView({ options }: { options: TestCaseOptions }) {
 						type="search"
 						aria-label="Search the description and the conversation"
 						value={search}
+						maxLength={MAX_SEARCH_LENGTH}
 						onChange={(event) => setSearch(event.target.value)}
 						placeholder="Search the description and the conversation"
 						className="h-11 rounded-xl border-gray-200 bg-white pl-9 text-[15px] shadow-none placeholder:text-gray-400 focus-visible:border-[#F65151] focus-visible:ring-[#F65151]/20"
@@ -444,7 +454,7 @@ export function DatasetView({ options }: { options: TestCaseOptions }) {
 							type="button"
 							variant="ghost"
 							size="sm"
-							onClick={() => loadPage(items.length > 0 ? page + 1 : 1)}
+							onClick={() => loadPage(listLoad.page ?? 1)}
 							className="text-red-800 hover:bg-red-100 hover:text-red-900"
 						>
 							Try again
