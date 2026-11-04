@@ -8,6 +8,8 @@ import {
 	EMPTY_FILTERS,
 	filterChoices,
 	filterRows,
+	hasFilters,
+	pageNumbers,
 	NOT_LABELLED,
 	optionLabel,
 	toRow,
@@ -120,8 +122,11 @@ describe("dataset view", () => {
 		expect(ids({ group: "milk" })).toEqual(["a"]);
 		expect(ids({ group: NOT_LABELLED })).toEqual(["b"]);
 		expect(ids({ answerType: "vet" })).toEqual(["c"]);
-		expect(ids({ tag: "weather" })).toEqual(["a", "b"]);
-		expect(ids({ caseType: "edge_case" })).toEqual(["a"]);
+		expect(ids({ tags: ["weather"] })).toEqual(["a", "b"]);
+		expect(ids({ tags: ["loan"] })).toEqual(["b"]);
+		// Several picked: a case with any of them matches.
+		expect(ids({ tags: ["loan", "weather"] })).toEqual(["a", "b"]);
+		expect(ids({ caseTypes: ["edge_case"] })).toEqual(["a"]);
 		expect(ids({ turns: "2-5" })).toEqual(["c"]);
 		expect(ids({ tester: "suraj", source: "bulk", language: "en" })).toEqual(["b"]);
 		expect(ids({ persona: "doctor" })).toEqual(["c"]);
@@ -142,9 +147,29 @@ describe("dataset view", () => {
 		expect(choices.map((c) => c.value)).toEqual(["answer", "book", "vet", "ask:farmer_code"]);
 	});
 
+	it("counts an empty list as no filter", () => {
+		expect(hasFilters(EMPTY_FILTERS)).toBe(false);
+		expect(hasFilters({ ...EMPTY_FILTERS, tags: ["weather"] })).toBe(true);
+		expect(hasFilters({ ...EMPTY_FILTERS, persona: "doctor" })).toBe(true);
+	});
+
+	it("shows the first, last and nearby pages, with gaps between", () => {
+		expect(pageNumbers(1, 5)).toEqual([1, 2, 3, 4, 5]);
+		expect(pageNumbers(1, 12)).toEqual([1, 2, "gap", 12]);
+		expect(pageNumbers(6, 12)).toEqual([1, "gap", 5, 6, 7, "gap", 12]);
+		expect(pageNumbers(12, 12)).toEqual([1, "gap", 11, 12]);
+		expect(pageNumbers(1, 1)).toEqual([1]);
+	});
+
 	it("keeps the sample in the #552 shape", () => {
 		const rows = SAMPLE_ITEMS.map(toRow);
-		expect(rows.every((row) => row.question && row.receivedAt)).toBe(true);
+		expect(rows.length).toBeGreaterThanOrEqual(20);
+		// The sample has to show the table's hard cases.
 		expect(rows.some((row) => !row.group)).toBe(true);
+		expect(rows.some((row) => row.answerType.startsWith("ask:"))).toBe(true);
+		expect(rows.some((row) => row.questionCount >= 6)).toBe(true);
+		expect(rows.some((row) => row.tags.length >= 4)).toBe(true);
+		expect(rows.some((row) => !row.receivedAt)).toBe(true);
+		expect(rows.some((row) => row.turns.length === 0)).toBe(true);
 	});
 });

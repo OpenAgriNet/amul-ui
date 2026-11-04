@@ -108,16 +108,17 @@ export const DATE_RANGES = [
 	{ value: "30", label: "Last 30 days", days: 30 }
 ];
 
-// "" means no filter on that column.
+// "" or [] means no filter on that column.
 export type DatasetFilters = {
 	// Searches the description, the topic and every turn.
 	q: string;
 	// Only the Question column.
 	question: string;
 	group: string;
-	tag: string;
+	// A case can have several tags and types, so these pick several: any of them matches.
+	tags: string[];
 	answerType: string;
-	caseType: string;
+	caseTypes: string[];
 	turns: string;
 	tester: string;
 	source: string;
@@ -130,9 +131,9 @@ export const EMPTY_FILTERS: DatasetFilters = {
 	q: "",
 	question: "",
 	group: "",
-	tag: "",
+	tags: [],
 	answerType: "",
-	caseType: "",
+	caseTypes: [],
 	turns: "",
 	tester: "",
 	source: "",
@@ -163,8 +164,8 @@ export function filterRows(
 				(filters.answerType === NOT_LABELLED
 					? !row.answerType
 					: row.answerType === filters.answerType)) &&
-			(!filters.tag || row.tags.includes(filters.tag)) &&
-			(!filters.caseType || row.caseTypes.includes(filters.caseType)) &&
+			(filters.tags.length === 0 || filters.tags.some((tag) => row.tags.includes(tag))) &&
+			(filters.caseTypes.length === 0 || filters.caseTypes.some((type) => row.caseTypes.includes(type))) &&
 			(!turnRange || (row.questionCount >= turnRange.min && row.questionCount <= turnRange.max)) &&
 			(!filters.tester || row.tester === filters.tester) &&
 			(!filters.source || row.source === filters.source) &&
@@ -202,6 +203,24 @@ export function filterChoices(
 		...known.map(({ value, label }) => ({ value, label })),
 		...extra.map((value) => ({ value, label: optionLabel(known, value) }))
 	];
+}
+
+export function hasFilters(filters: DatasetFilters): boolean {
+	return Object.values(filters).some((value) => (Array.isArray(value) ? value.length > 0 : Boolean(value)));
+}
+
+export const PAGE_SIZES = [10, 25, 50];
+
+// The page buttons to show: the first, the last, and the current one with a neighbour
+// on each side; "gap" where pages are skipped. 7 pages or fewer are all shown.
+export function pageNumbers(current: number, pageCount: number): Array<number | "gap"> {
+	if (pageCount <= 7) return Array.from({ length: pageCount }, (_, i) => i + 1);
+	const pages = [...new Set([1, current - 1, current, current + 1, pageCount])]
+		.filter((n) => n >= 1 && n <= pageCount)
+		.sort((a, b) => a - b);
+	return pages.flatMap((n, i) =>
+		i > 0 && n - (pages[i - 1] ?? n) > 1 ? ["gap" as const, n] : [n]
+	);
 }
 
 // Dev is frozen for the demo, so #552 isn't on dev yet. Until it is, the screen reads a
