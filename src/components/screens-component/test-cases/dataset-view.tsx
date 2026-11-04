@@ -48,9 +48,9 @@ type Column = {
 	className?: string;
 	// The column's filter; Question has a text box instead.
 	filter?: { key: SelectKey; choices: Array<{ value: string; label: string }> };
-/* eslint-enable no-unused-vars */
 	cell: (row: DatasetRow) => React.ReactNode;
 };
+/* eslint-enable no-unused-vars */
 
 const dash = <span className="text-gray-400">—</span>;
 const notLabelled = <span className="text-xs text-gray-400 italic">Not labelled yet</span>;
