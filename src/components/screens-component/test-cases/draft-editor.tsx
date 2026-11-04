@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, AlertTriangle, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { activeTurns, buildPayload, hasErrors, isTurnEdited, validateDraft } from "@/lib/test-cases/draft";
+import { activeTurns, buildPayload, hasErrors, isTurnEdited, pairsOf, validateDraft } from "@/lib/test-cases/draft";
 import { submitTestCase, TestCaseApiError } from "@/lib/test-cases/api";
 import type { TestCaseDraft, TestCaseIssue } from "@/lib/test-cases/types";
 import { DetailsForm } from "./details-form";
@@ -15,11 +15,10 @@ type DraftEditorProps = {
 	onChange: (update: (draft: TestCaseDraft) => TestCaseDraft) => void;
 	onSubmitted: () => void;
 	onSubmitFailed: (message: string) => void;
-	conversationActions?: React.ReactNode;
 };
 /* eslint-enable no-unused-vars */
 
-export function DraftEditor({ draft, submittedBy, onChange, onSubmitted, onSubmitFailed, conversationActions }: DraftEditorProps) {
+export function DraftEditor({ draft, submittedBy, onChange, onSubmitted, onSubmitFailed }: DraftEditorProps) {
 	// Errors stay quiet until the first submit so a half-written draft isn't red.
 	const [attempted, setAttempted] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
@@ -44,13 +43,13 @@ export function DraftEditor({ draft, submittedBy, onChange, onSubmitted, onSubmi
 
 	const turns = activeTurns(draft);
 	const questions = turns.filter((t) => t.role === "user").length;
-	const removed = draft.turns.length - turns.length;
+	const leftOut = pairsOf(draft.turns).filter((pair) => pair.turns[0]?.removed).length;
 	const edited = turns.filter(isTurnEdited).length;
 	const summary = [
 		`${questions} question${questions === 1 ? "" : "s"}`,
 		`${turns.length - questions} answer${turns.length - questions === 1 ? "" : "s"}`,
 		edited > 0 && `${edited} edited`,
-		removed > 0 && `${removed} removed`
+		leftOut > 0 && `${leftOut} left out`
 	]
 		.filter(Boolean)
 		.join(" · ");
@@ -91,17 +90,14 @@ export function DraftEditor({ draft, submittedBy, onChange, onSubmitted, onSubmi
 	return (
 		<div className="flex flex-col gap-6">
 			<section className="flex flex-col gap-3">
-				<div className="flex flex-wrap items-end justify-between gap-2">
-					<div>
-						<h2 className="text-base font-semibold text-gray-900">Conversation</h2>
-						<p className="text-sm text-gray-500">{summary}</p>
-					</div>
-					{conversationActions}
+				<div>
+					<h2 className="text-base font-semibold text-gray-900">Conversation</h2>
+					<p className="text-sm text-gray-500">{summary}</p>
 				</div>
 				<p className="text-sm text-gray-600">
 					{draft.source === "manual"
-						? "Type the conversation turn by turn: the farmer's question, then the answer the bot should give."
-						: "Fix any answer that is wrong so it reads the way the bot should reply, and remove turns that don't matter for this test."}
+						? "Write each turn as a farmer question and the answer the bot should give."
+						: "Fix any answer that is wrong so it reads the way the bot should reply. Untick the questions that don't matter for this test."}
 				</p>
 				<TurnEditor draft={draft} onChange={onChange} errorTurnIds={errorTurnIds} />
 			</section>

@@ -13,7 +13,7 @@ import { ProfileDialog } from "@/components/screens-component/profile/profile-di
 import { FarmerAlert } from "@/components/screens-component/chat-screen/components/farmer-alert";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/apis/profile";
-import { useUiFlags } from "@/lib/ui-flags";
+import { loadUiFlags, useUiFlags } from "@/lib/ui-flags";
 
 const OPEN_FAQ_PANEL_EVENT = "open-faq-panel";
 
@@ -43,6 +43,10 @@ function ChatLayout() {
 
 	const { language, t } = useLanguage();
 	const flags = useUiFlags();
+	// Loaded once on start; this retries when that call failed (a successful load is cached).
+	useEffect(() => {
+		void loadUiFlags();
+	}, []);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [faqExpandCategory, setFaqExpandCategory] = useState<FAQCategoryId | undefined>();
 	const [profileOpen, setProfileOpen] = useState(false);

@@ -132,6 +132,11 @@ export function BulkUpload({ submittedBy, options, onFinished }: BulkUploadProps
 				<h2 className="text-base font-semibold text-gray-900">1. Fill in the template</h2>
 				<ul className="flex flex-col gap-1 text-sm text-gray-600">
 					<li>
+						Write your cases on the first sheet, <span className="font-medium text-gray-800">Test cases</span>. The{" "}
+						<span className="font-medium text-gray-800">Examples</span> sheet shows two filled-in cases; only the first
+						sheet is uploaded.
+					</li>
+					<li>
 						<span className="font-medium text-gray-800">One row per message.</span> Rows with the same{" "}
 						<code className="rounded bg-gray-100 px-1">case_id</code> make one test case.
 					</li>
@@ -143,8 +148,8 @@ export function BulkUpload({ submittedBy, options, onFinished }: BulkUploadProps
 						Write the <code className="rounded bg-gray-100 px-1">description</code> (required),{" "}
 						<code className="rounded bg-gray-100 px-1">case_type</code> and{" "}
 						<code className="rounded bg-gray-100 px-1">tags</code> once, on the first row of each case. Put all the types
-						in one cell and all the tags in one cell, separated by commas. Types and tags are optional; the template's
-						second sheet lists the ones you can use.
+						in one cell and all the tags in one cell, separated by commas. Types and tags are optional; the{" "}
+						<span className="font-medium text-gray-800">Allowed values</span> sheet lists the ones you can use.
 					</li>
 					<li>
 						Optional columns: <code className="rounded bg-gray-100 px-1">other_topic</code> (what the case is about, required with
