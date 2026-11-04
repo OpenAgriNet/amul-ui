@@ -15,7 +15,6 @@ import {
 	toRow,
 	type DatasetItem
 } from "./dataset";
-import { SAMPLE_ITEMS } from "./dataset-sample";
 import { TEST_OPTIONS } from "./test-fixtures";
 
 const NOW = Date.parse("2026-11-04T12:00:00Z");
@@ -66,7 +65,7 @@ describe("dataset view", () => {
 		expect(toRow({ id: "y" }).turns).toEqual([]);
 	});
 
-	it("takes the label, the first question and the edits from the stored case", () => {
+	it("takes the label, the last question and the edits from the stored case", () => {
 		const row = toRow({
 			id: "z",
 			input: {
@@ -79,7 +78,7 @@ describe("dataset view", () => {
 			metadata: { label: { group: "milk", answer_type: "answer" } }
 		});
 		expect(row).toMatchObject({
-			question: "First?",
+			question: "Second?",
 			questionCount: 2,
 			group: "milk",
 			answerType: "answer"
@@ -142,6 +141,8 @@ describe("dataset view", () => {
 		expect(optionLabel(TEST_OPTIONS.answerTypes, "ask:farmer_code")).toBe(
 			"Asks for the farmer code"
 		);
+		expect(optionLabel(TEST_OPTIONS.answerTypes, "ask:signin")).toBe("Asks the farmer to sign in");
+		expect(optionLabel(TEST_OPTIONS.answerTypes, "ask:clarify")).toBe("Asks the farmer to clarify");
 		expect(optionLabel(TEST_OPTIONS.groups, "old_group")).toBe("old_group");
 		const choices = filterChoices(TEST_OPTIONS.answerTypes, ["vet", "ask:farmer_code", ""]);
 		expect(choices.map((c) => c.value)).toEqual(["answer", "book", "vet", "ask:farmer_code"]);
@@ -159,17 +160,5 @@ describe("dataset view", () => {
 		expect(pageNumbers(6, 12)).toEqual([1, "gap", 5, 6, 7, "gap", 12]);
 		expect(pageNumbers(12, 12)).toEqual([1, "gap", 11, 12]);
 		expect(pageNumbers(1, 1)).toEqual([1]);
-	});
-
-	it("keeps the sample in the #552 shape", () => {
-		const rows = SAMPLE_ITEMS.map(toRow);
-		expect(rows.length).toBeGreaterThanOrEqual(20);
-		// The sample has to show the table's hard cases.
-		expect(rows.some((row) => !row.group)).toBe(true);
-		expect(rows.some((row) => row.answerType.startsWith("ask:"))).toBe(true);
-		expect(rows.some((row) => row.questionCount >= 6)).toBe(true);
-		expect(rows.some((row) => row.tags.length >= 4)).toBe(true);
-		expect(rows.some((row) => !row.receivedAt)).toBe(true);
-		expect(rows.some((row) => row.turns.length === 0)).toBe(true);
 	});
 });

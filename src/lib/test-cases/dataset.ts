@@ -1,5 +1,4 @@
 import { testCaseRequest } from "./api";
-import { SAMPLE_ITEMS } from "./dataset-sample";
 import type { TestCaseOption, TestCaseRole } from "./types";
 
 // Read-only view of the cases already in the dataset (amul-oan-api#552):
@@ -43,7 +42,7 @@ export type DatasetRow = {
 	answerType: string;
 	tags: string[];
 	caseTypes: string[];
-	// The farmer's first question, which names the case in the table.
+	// The farmer's last question: the one the case's label is about.
 	question: string;
 	questionCount: number;
 	tester: string;
@@ -74,6 +73,7 @@ export function toRow(item: DatasetItem): DatasetRow {
 				]
 			: []
 	);
+	const questions = turns.filter((turn) => turn.role === "user");
 	return {
 		id: item.id,
 		receivedAt: text(item.metadata?.received_at),
@@ -81,8 +81,10 @@ export function toRow(item: DatasetItem): DatasetRow {
 		answerType: text(item.metadata?.label?.answer_type),
 		tags: list(input.tags),
 		caseTypes: list(input.case_types),
-		question: turns.find((turn) => turn.role === "user")?.content ?? "",
-		questionCount: turns.filter((turn) => turn.role === "user").length,
+		// The labeller files a chat under the farmer's last question, so the table names the
+		// case by it too. The opened row shows the whole chat.
+		question: questions[questions.length - 1]?.content ?? "",
+		questionCount: questions.length,
 		tester: text(input.submitted_by),
 		source: text(input.source),
 		persona: text(input.persona),
@@ -181,13 +183,20 @@ export function filterRows(
 	});
 }
 
+// "ask:<what>" answers that don't read as "Asks for the <what>".
+const ASKS: Record<string, string> = {
+	clarify: "Asks the farmer to clarify",
+	signin: "Asks the farmer to sign in"
+};
+
 // The label for an id from one of the option lists. The labeller may also answer
 // "ask:<what>" for a bot that should ask the farmer something first.
 export function optionLabel(list: TestCaseOption[], id: string): string {
 	const known = list.find((option) => option.value === id)?.label;
 	if (known) return known;
 	const asked = /^ask:(.+)$/.exec(id)?.[1];
-	return asked ? `Asks for the ${asked.replace(/_/g, " ")}` : id;
+	if (!asked) return id;
+	return ASKS[asked] ?? `Asks for the ${asked.replace(/_/g, " ")}`;
 }
 
 // A column filter's choices: the known list, plus any value the cases hold that the
@@ -223,16 +232,8 @@ export function pageNumbers(current: number, pageCount: number): Array<number | 
 	);
 }
 
-// Dev is frozen for the demo, so #552 isn't on dev yet. Until it is, the screen reads a
-// sample in its shape. Set this to false once #552 is on dev.
-const USE_SAMPLE_DATA = true;
-const SAMPLE_LATENCY_MS = 300;
-
+// The real cases. Where the backend has test cases off, the screen itself is hidden.
 export async function fetchDataset(): Promise<DatasetRow[]> {
-	const { items } = USE_SAMPLE_DATA
-		? await new Promise<{ items: DatasetItem[] }>((resolve) =>
-				setTimeout(() => resolve({ items: SAMPLE_ITEMS }), SAMPLE_LATENCY_MS)
-			)
-		: await testCaseRequest<{ items: DatasetItem[] }>("/api/test-cases/");
+	const { items } = await testCaseRequest<{ items: DatasetItem[] }>("/api/test-cases/");
 	return (Array.isArray(items) ? items : []).map(toRow);
 }

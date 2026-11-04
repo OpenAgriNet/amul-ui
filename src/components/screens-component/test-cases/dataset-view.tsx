@@ -38,7 +38,7 @@ import { FieldSelect } from "./field-select";
 
 // Radix Select can't hold an empty value, so "no filter" has a value of its own.
 const ANY = "any";
-// The search box is sent nowhere now, but the old list route answered 422 past this.
+// A cap for the two text filters, which only filter the cases already loaded.
 const MAX_SEARCH_LENGTH = 200;
 
 const SOURCE_OPTIONS: TestCaseOption[] = [
@@ -306,6 +306,9 @@ export function DatasetView({ options }: { options: TestCaseOptions }) {
 		setFilters((current) => ({ ...current, [key]: value }));
 	const setFilter = (key: Exclude<keyof DatasetFilters, MultiKey>) => (value: string) =>
 		setFilters((current) => ({ ...current, [key]: value === ANY ? "" : value }));
+	// The text boxes keep what is typed, "any" too; only the selects use ANY for "All".
+	const setText = (key: "q" | "question") => (value: string) =>
+		setFilters((current) => ({ ...current, [key]: value }));
 
 	const testers: TestCaseOption[] = options.testers.map((t) => ({
 		value: t.id,
@@ -472,7 +475,7 @@ export function DatasetView({ options }: { options: TestCaseOptions }) {
 						aria-label="Search the description and the conversation"
 						value={filters.q}
 						maxLength={MAX_SEARCH_LENGTH}
-						onChange={(event) => setFilter("q")(event.target.value)}
+						onChange={(event) => setText("q")(event.target.value)}
 						placeholder="Search the description and the conversation"
 						className="h-11 rounded-xl border-gray-200 bg-white pl-9 text-[15px] shadow-none placeholder:text-gray-400 focus-visible:border-[#F65151] focus-visible:ring-[#F65151]/20"
 					/>
@@ -575,7 +578,7 @@ export function DatasetView({ options }: { options: TestCaseOptions }) {
 													aria-label="Filter by question"
 													value={filters.question}
 													maxLength={MAX_SEARCH_LENGTH}
-													onChange={(event) => setFilter("question")(event.target.value)}
+													onChange={(event) => setText("question")(event.target.value)}
 													placeholder="Filter questions"
 													className="h-9 rounded-lg border-gray-200 bg-white text-sm shadow-none placeholder:text-gray-400 focus-visible:border-[#F65151] focus-visible:ring-[#F65151]/20"
 												/>
