@@ -1,69 +1,150 @@
 import { describe, expect, it, vi } from "vitest";
 
 // dataset.ts reaches api-service, which reads the saved token as soon as it is imported.
-vi.hoisted(() => vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {}, removeItem: () => {} }));
-import { datasetQuery, EMPTY_FILTERS, filterCases, type DatasetCase } from "./dataset";
-import { SAMPLE_CASES, SAMPLE_COVERAGE } from "./dataset-sample";
+vi.hoisted(() =>
+	vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {}, removeItem: () => {} })
+);
+import {
+	EMPTY_FILTERS,
+	filterChoices,
+	filterRows,
+	NOT_LABELLED,
+	optionLabel,
+	toRow,
+	type DatasetItem
+} from "./dataset";
+import { SAMPLE_ITEMS } from "./dataset-sample";
+import { TEST_OPTIONS } from "./test-fixtures";
 
-const make = (id: string, received_at: string, extra: Partial<DatasetCase> = {}): DatasetCase => ({
+const NOW = Date.parse("2026-11-04T12:00:00Z");
+
+const item = (
+	id: string,
+	days: number,
+	input: DatasetItem["input"] = {},
+	label?: { group: string; answer_type: string }
+): DatasetItem => ({
 	id,
-	received_at,
-	source: "chat",
-	submitted_by: "vishal",
-	persona: "farmer",
-	language: "gu",
-	description: `Case ${id}`,
-	case_types: [],
-	tags: [],
-	turns: [
-		{ role: "user", content: `Question ${id}` },
-		{ role: "assistant", content: `Answer ${id}` }
-	],
-	...extra
+	input: {
+		source: "chat",
+		submitted_by: "vishal",
+		persona: "farmer",
+		language: "gu",
+		description: `Case ${id}`,
+		case_types: [],
+		tags: [],
+		turns: [
+			{ role: "user", content: `Question ${id}` },
+			{ role: "assistant", content: `Answer ${id}` }
+		],
+		...input
+	},
+	metadata: {
+		received_at: new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString(),
+		...(label ? { label } : {})
+	}
 });
 
 describe("dataset view", () => {
-	it("sends the filters the way the list route reads them", () => {
-		const query = datasetQuery({ ...EMPTY_FILTERS, tags: ["weather", "loan"], caseTypes: ["edge_case"], persona: "farmer", q: "  rain " }, 2);
-		const params = new URLSearchParams(query);
-		expect(params.getAll("tag")).toEqual(["weather", "loan"]);
-		expect(params.getAll("case_type")).toEqual(["edge_case"]);
-		expect(params.get("persona")).toBe("farmer");
-		expect(params.get("q")).toBe("rain");
-		expect(params.get("page")).toBe("2");
-		expect(params.get("limit")).toBe("20");
-		expect(params.has("language")).toBe(false);
-		expect(params.has("submitted_by")).toBe(false);
+	it("reads a case whose fields are missing without failing", () => {
+		const row = toRow({
+			id: "x",
+			input: { turns: [{ role: "user" }, { content: "no role" } as never] }
+		});
+		expect(row).toMatchObject({
+			id: "x",
+			question: "",
+			questionCount: 1,
+			tags: [],
+			caseTypes: [],
+			group: "",
+			answerType: "",
+			receivedAt: ""
+		});
+		expect(toRow({ id: "y" }).turns).toEqual([]);
 	});
 
-	it("filters the sample like the backend: any tag, exact fields, text in turns, newest first", () => {
-		const cases = [
-			make("a", "2026-11-01T00:00:00Z", { tags: ["weather"] }),
-			make("b", "2026-11-03T00:00:00Z", { tags: ["loan"], submitted_by: "suraj" }),
-			make("c", "2026-11-02T00:00:00Z", { tags: ["weather", "loan"], language: "en" })
-		];
-		const ids = (filters: Partial<typeof EMPTY_FILTERS>) => filterCases(cases, { ...EMPTY_FILTERS, ...filters }, 1).items.map((c) => c.id);
-		expect(ids({})).toEqual(["b", "c", "a"]);
-		expect(ids({ tags: ["weather"] })).toEqual(["c", "a"]);
-		expect(ids({ tags: ["weather", "loan"] })).toEqual(["b", "c", "a"]);
-		expect(ids({ submittedBy: "suraj" })).toEqual(["b"]);
-		expect(ids({ language: "en" })).toEqual(["c"]);
-		expect(ids({ q: "answer a" })).toEqual(["a"]);
+	it("takes the label, the first question and the edits from the stored case", () => {
+		const row = toRow({
+			id: "z",
+			input: {
+				turns: [
+					{ role: "user", content: "First?" },
+					{ role: "assistant", content: "Fixed answer", original_content: "Bot answer" },
+					{ role: "user", content: "Second?" }
+				]
+			},
+			metadata: { label: { group: "milk", answer_type: "answer" } }
+		});
+		expect(row).toMatchObject({
+			question: "First?",
+			questionCount: 2,
+			group: "milk",
+			answerType: "answer"
+		});
+		expect(row.turns[1]?.originalContent).toBe("Bot answer");
 	});
 
-	it("pages the sample", () => {
-		const cases = Array.from({ length: 25 }, (_, i) => make(String(i).padStart(2, "0"), `2026-10-${String(i + 1).padStart(2, "0")}T00:00:00Z`));
-		const second = filterCases(cases, EMPTY_FILTERS, 2);
-		expect(second.total).toBe(25);
-		expect(second.items).toHaveLength(5);
-		expect(second.page).toBe(2);
+	it("filters every column in the browser", () => {
+		const rows = [
+			item(
+				"a",
+				0,
+				{ tags: ["weather"], case_types: ["edge_case"] },
+				{ group: "milk", answer_type: "answer" }
+			),
+			item("b", 3, {
+				tags: ["loan", "weather"],
+				submitted_by: "suraj",
+				source: "bulk",
+				language: "en"
+			}),
+			item(
+				"c",
+				20,
+				{
+					persona: "doctor",
+					turns: [
+						{ role: "user", content: "One" },
+						{ role: "assistant", content: "A" },
+						{ role: "user", content: "Two" },
+						{ role: "assistant", content: "fever answer" }
+					]
+				},
+				{ group: "vet-health", answer_type: "vet" }
+			)
+		].map(toRow);
+		const ids = (filters: Partial<typeof EMPTY_FILTERS>) =>
+			filterRows(rows, { ...EMPTY_FILTERS, ...filters }, NOW).map((r) => r.id);
+		expect(ids({})).toEqual(["a", "b", "c"]);
+		expect(ids({ group: "milk" })).toEqual(["a"]);
+		expect(ids({ group: NOT_LABELLED })).toEqual(["b"]);
+		expect(ids({ answerType: "vet" })).toEqual(["c"]);
+		expect(ids({ tag: "weather" })).toEqual(["a", "b"]);
+		expect(ids({ caseType: "edge_case" })).toEqual(["a"]);
+		expect(ids({ turns: "2-5" })).toEqual(["c"]);
+		expect(ids({ tester: "suraj", source: "bulk", language: "en" })).toEqual(["b"]);
+		expect(ids({ persona: "doctor" })).toEqual(["c"]);
+		expect(ids({ date: "7" })).toEqual(["a", "b"]);
+		expect(ids({ date: "1" })).toEqual(["a"]);
+		expect(ids({ question: "question b" })).toEqual(["b"]);
+		expect(ids({ q: "fever" })).toEqual(["c"]);
+		expect(ids({ q: "case a" })).toEqual(["a"]);
 	});
 
-	it("keeps the sample consistent with the counts", () => {
-		expect(SAMPLE_CASES).toHaveLength(SAMPLE_COVERAGE.total);
-		expect(SAMPLE_CASES.filter((c) => c.tags.length === 0)).toHaveLength(SAMPLE_COVERAGE.untagged);
-		for (const { id, count } of SAMPLE_COVERAGE.tags) {
-			expect(SAMPLE_CASES.filter((c) => c.tags.includes(id))).toHaveLength(count);
-		}
+	it("names labels, including ask: answers and ids the list doesn't know", () => {
+		expect(optionLabel(TEST_OPTIONS.answerTypes, "vet")).toBe("Sends to a vet");
+		expect(optionLabel(TEST_OPTIONS.answerTypes, "ask:farmer_code")).toBe(
+			"Asks for the farmer code"
+		);
+		expect(optionLabel(TEST_OPTIONS.groups, "old_group")).toBe("old_group");
+		const choices = filterChoices(TEST_OPTIONS.answerTypes, ["vet", "ask:farmer_code", ""]);
+		expect(choices.map((c) => c.value)).toEqual(["answer", "book", "vet", "ask:farmer_code"]);
+	});
+
+	it("keeps the sample in the #552 shape", () => {
+		const rows = SAMPLE_ITEMS.map(toRow);
+		expect(rows.every((row) => row.question && row.receivedAt)).toBe(true);
+		expect(rows.some((row) => !row.group)).toBe(true);
 	});
 });

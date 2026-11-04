@@ -1,4 +1,10 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 /* eslint-disable no-unused-vars */
@@ -9,16 +15,27 @@ type FieldSelectProps = {
 	options: Array<{ value: string; label: string }>;
 	placeholder?: string;
 	className?: string;
+	// For a field with no visible label of its own, like a table column filter.
+	ariaLabel?: string;
 };
 /* eslint-enable no-unused-vars */
 
 // The dropdown of the test-case forms, in the screen's red. The menu opens below the
 // field at the field's width, so it never covers the tabs or the field itself.
-export function FieldSelect({ id, value, onValueChange, options, placeholder, className }: FieldSelectProps) {
+export function FieldSelect({
+	id,
+	value,
+	onValueChange,
+	options,
+	placeholder,
+	className,
+	ariaLabel
+}: FieldSelectProps) {
 	return (
 		<Select value={value} onValueChange={onValueChange}>
 			<SelectTrigger
 				id={id}
+				aria-label={ariaLabel}
 				className={cn(
 					"w-full min-w-0 cursor-pointer rounded-xl border-gray-200 bg-white text-[15px] text-gray-900 shadow-none transition-colors hover:border-[#F65151]/60 focus-visible:border-[#F65151] focus-visible:ring-[#F65151]/20 data-[placeholder]:text-gray-400 data-[size=default]:h-11 data-[state=open]:border-[#F65151]",
 					className

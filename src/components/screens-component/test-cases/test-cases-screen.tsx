@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Library, MessagesSquare, PenLine, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toast, type ToastType } from "@/components/screens-component/chat-screen/components/toast";
@@ -137,7 +138,8 @@ export function TestCasesScreen() {
 				</div>
 
 				<div className="min-h-0 flex-1 overflow-y-auto">
-					<div className="mx-auto max-w-3xl px-4 pt-4">
+					{/* The dataset table uses the full width; the forms stay at reading width. */}
+					<div className={cn("mx-auto px-4 pt-4", tab === "dataset" ? "max-w-none" : "max-w-3xl")}>
 						{!options ? (
 							<div className="flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white px-6 py-10 text-center shadow-sm">
 								{optionsStatus === "error" ? (

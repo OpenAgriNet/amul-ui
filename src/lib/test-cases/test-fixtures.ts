@@ -53,5 +53,15 @@ export const TEST_OPTIONS: TestCaseOptions = {
 		{ id: "vishal", label: "Vishal" }
 	],
 	caseTypes: CASE_TYPES,
-	tags: FEATURE_TAGS
+	tags: FEATURE_TAGS,
+	groups: [
+		{ value: "ai", label: "AI", hint: "Artificial insemination." },
+		{ value: "vet-health", label: "Vet & health", hint: "Animal health, feed and treatment." },
+		{ value: "milk", label: "Milk", hint: "Milk pouring records, price and payments." }
+	],
+	answerTypes: [
+		{ value: "answer", label: "Answers", hint: "It answers." },
+		{ value: "book", label: "Books an AI call", hint: "It books an AI call." },
+		{ value: "vet", label: "Sends to a vet", hint: "The main advice is to get a vet." }
+	]
 };

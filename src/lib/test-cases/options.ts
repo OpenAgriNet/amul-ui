@@ -9,6 +9,10 @@ export type TestCaseOptions = {
 	testers: Tester[];
 	caseTypes: TestCaseOption[];
 	tags: TestCaseOption[];
+	// The labeller's lists, shown in the Dataset tab: the group a case is about (the
+	// Category column) and what the bot should do (the Answer type column).
+	groups: TestCaseOption[];
+	answerTypes: TestCaseOption[];
 };
 
 type WireOption = { id: string; label: string; hint?: string };
@@ -16,6 +20,8 @@ export type WireOptions = {
 	testers: WireOption[];
 	case_types: WireOption[];
 	tags: WireOption[];
+	groups?: WireOption[];
+	answer_types?: WireOption[];
 };
 
 // The server may still send test_accounts; they are left out until v2.
@@ -25,7 +31,9 @@ export function parseOptions(wire: WireOptions): TestCaseOptions {
 	return {
 		testers: wire.testers.map(({ id, label }) => ({ id, label })),
 		caseTypes: wire.case_types.map(toOption),
-		tags: wire.tags.map(toOption)
+		tags: wire.tags.map(toOption),
+		groups: (wire.groups ?? []).map(toOption),
+		answerTypes: (wire.answer_types ?? []).map(toOption)
 	};
 }
 
