@@ -5,7 +5,7 @@ import type { ChatPersona } from "@/lib/chat-persona";
 import { activeTurns, emptyDraft, mergeChatTurns, turnsFromChat } from "@/lib/test-cases/draft";
 import type { TestCaseDraft } from "@/lib/test-cases/types";
 
-export type TestCaseTab = "chat" | "manual" | "bulk";
+export type TestCaseTab = "chat" | "manual" | "bulk" | "dataset";
 type DraftKind = "chat" | "manual";
 type ChatMeta = { sessionId: string | null; language: string; persona: ChatPersona };
 
