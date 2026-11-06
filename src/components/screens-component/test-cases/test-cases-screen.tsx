@@ -103,9 +103,6 @@ export function TestCasesScreen() {
 						<h1 className="truncate text-lg font-bold text-gray-900">Add test cases</h1>
 						<p className="truncate text-xs text-gray-500">For the Amul AI testing dataset</p>
 					</div>
-					<span className="ml-auto shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-						Dev only
-					</span>
 				</div>
 			</header>
 
