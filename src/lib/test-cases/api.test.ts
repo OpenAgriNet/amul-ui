@@ -47,10 +47,14 @@ describe("test case API", () => {
 	});
 
 	it("reads the lists from /api/test-cases/options/", async () => {
-		reply(200, { testers: TEST_OPTIONS.testers, case_types: TEST_OPTIONS.caseTypes.map(toWire), tags: TEST_OPTIONS.tags.map(toWire) });
+		const followUp = { id: "follow_up", label: "Follow-up question", hint: "", category: false };
+		reply(200, { testers: TEST_OPTIONS.testers, case_types: TEST_OPTIONS.caseTypes.map(toWire), tags: [...TEST_OPTIONS.tags.map(toWire), followUp] });
 		const options = await fetchTestCaseOptions();
 		expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toMatch(/\/api\/test-cases\/options\/$/);
 		expect(options.tags.some((tag) => tag.value === "vet_office")).toBe(true);
+		// Every tag is a category a case can be filed under, unless the server says it isn't.
+		expect(options.tags.map((tag) => tag.value)).toContain("follow_up");
+		expect(options.categories).toEqual(TEST_OPTIONS.tags);
 		expect(options.testers[0]).toEqual({ id: "kanav", label: "Kanav" });
 	});
 });

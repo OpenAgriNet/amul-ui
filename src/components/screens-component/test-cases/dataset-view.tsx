@@ -56,7 +56,7 @@ const LANGUAGE_OPTIONS: TestCaseOption[] = Object.values(LANGUAGES).map(({ code,
 	hint: ""
 }));
 
-type MultiKey = "tags" | "caseTypes";
+type MultiKey = "caseTypes";
 type SelectKey = Exclude<keyof DatasetFilters, "q" | "question" | MultiKey>;
 /* eslint-disable no-unused-vars */
 type Column = {
@@ -316,39 +316,31 @@ export function DatasetView({ options }: { options: TestCaseOptions }) {
 		hint: ""
 	}));
 	const unlabelled = { value: NOT_LABELLED, label: "No label yet" };
+	const isCategory = (id: string) => options.categories.some((option) => option.value === id);
 
 	const columns: Column[] = [
 		{
-			key: "group",
+			key: "category",
 			title: "Category",
-			width: "7rem",
+			width: "10rem",
 			filter: {
-				key: "group",
+				key: "category",
 				choices: [
 					...filterChoices(
-						options.groups,
-						rows.map((r) => r.group)
+						options.categories,
+						rows.map((r) => r.category)
 					),
 					unlabelled
 				]
 			},
-			cell: (row) => (
-				<Line value={row.group ? optionLabel(options.groups, row.group) : ""} empty={notLabelled} />
-			)
-		},
-		{
-			key: "tag",
-			title: "Tag",
-			width: "8.5rem",
-			filter: {
-				key: "tags",
-				multi: true,
-				choices: filterChoices(
-					options.tags,
-					rows.flatMap((r) => r.tags)
+			// The feature the labeller filed the case under. Until it has run, the features
+			// the tester tagged stand in, as chips: the same ones the filter finds it under.
+			cell: (row) =>
+				row.category ? (
+					<Line value={optionLabel(options.categories, row.category)} />
+				) : (
+					<Chips ids={row.tags.filter(isCategory)} list={options.categories} tone="tag" />
 				)
-			},
-			cell: (row) => <Chips ids={row.tags} list={options.tags} tone="tag" />
 		},
 		{
 			key: "question",
@@ -532,7 +524,7 @@ export function DatasetView({ options }: { options: TestCaseOptions }) {
 					<div className="overflow-x-auto">
 						{/* table-fixed: column widths come from the colgroup, not from the rows shown,
 						    so the columns stay put as filters change. */}
-						<table className="w-full min-w-[83rem] table-fixed border-collapse text-left text-sm">
+						<table className="w-full min-w-[78rem] table-fixed border-collapse text-left text-sm">
 							<colgroup>
 								{columns.map((column) => (
 									<col
@@ -647,7 +639,9 @@ export function DatasetView({ options }: { options: TestCaseOptions }) {
 																},
 																{
 																	label: "Category",
-																	value: row.group ? optionLabel(options.groups, row.group) : ""
+																	value: row.category
+																		? optionLabel(options.categories, row.category)
+																		: ""
 																},
 																{
 																	label: "Answer type",

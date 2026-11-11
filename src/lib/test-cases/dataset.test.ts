@@ -23,7 +23,7 @@ const item = (
 	id: string,
 	days: number,
 	input: DatasetItem["input"] = {},
-	label?: { group: string; answer_type: string }
+	label?: { category: string; answer_type: string }
 ): DatasetItem => ({
 	id,
 	input: {
@@ -58,7 +58,7 @@ describe("dataset view", () => {
 			questionCount: 1,
 			tags: [],
 			caseTypes: [],
-			group: "",
+			category: "",
 			answerType: "",
 			receivedAt: ""
 		});
@@ -75,12 +75,12 @@ describe("dataset view", () => {
 					{ role: "user", content: "Second?" }
 				]
 			},
-			metadata: { label: { group: "milk", answer_type: "answer" } }
+			metadata: { label: { category: "milk_collection", answer_type: "answer" } }
 		});
 		expect(row).toMatchObject({
 			question: "Second?",
 			questionCount: 2,
-			group: "milk",
+			category: "milk_collection",
 			answerType: "answer"
 		});
 		expect(row.turns[1]?.originalContent).toBe("Bot answer");
@@ -92,10 +92,11 @@ describe("dataset view", () => {
 				"a",
 				0,
 				{ tags: ["weather"], case_types: ["edge_case"] },
-				{ group: "milk", answer_type: "answer" }
+				{ category: "milk_collection", answer_type: "answer" }
 			),
 			item("b", 3, {
 				tags: ["loan", "weather"],
+				case_types: ["wrong_answer"],
 				submitted_by: "suraj",
 				source: "bulk",
 				language: "en"
@@ -112,20 +113,22 @@ describe("dataset view", () => {
 						{ role: "assistant", content: "fever answer" }
 					]
 				},
-				{ group: "vet-health", answer_type: "vet" }
+				{ category: "veterinary_advisory", answer_type: "vet" }
 			)
 		].map(toRow);
 		const ids = (filters: Partial<typeof EMPTY_FILTERS>) =>
 			filterRows(rows, { ...EMPTY_FILTERS, ...filters }, NOW).map((r) => r.id);
 		expect(ids({})).toEqual(["a", "b", "c"]);
-		expect(ids({ group: "milk" })).toEqual(["a"]);
-		expect(ids({ group: NOT_LABELLED })).toEqual(["b"]);
+		expect(ids({ category: "milk_collection" })).toEqual(["a"]);
+		expect(ids({ category: NOT_LABELLED })).toEqual(["b"]);
+		// A labelled case counts under its category only. One with no label yet counts under
+		// each feature its tester tagged.
+		expect(ids({ category: "weather" })).toEqual(["b"]);
+		expect(ids({ category: "loan" })).toEqual(["b"]);
 		expect(ids({ answerType: "vet" })).toEqual(["c"]);
-		expect(ids({ tags: ["weather"] })).toEqual(["a", "b"]);
-		expect(ids({ tags: ["loan"] })).toEqual(["b"]);
-		// Several picked: a case with any of them matches.
-		expect(ids({ tags: ["loan", "weather"] })).toEqual(["a", "b"]);
 		expect(ids({ caseTypes: ["edge_case"] })).toEqual(["a"]);
+		// Several picked: a case with any of them matches.
+		expect(ids({ caseTypes: ["edge_case", "wrong_answer"] })).toEqual(["a", "b"]);
 		expect(ids({ turns: "2-5" })).toEqual(["c"]);
 		expect(ids({ tester: "suraj", source: "bulk", language: "en" })).toEqual(["b"]);
 		expect(ids({ persona: "doctor" })).toEqual(["c"]);
@@ -143,14 +146,14 @@ describe("dataset view", () => {
 		);
 		expect(optionLabel(TEST_OPTIONS.answerTypes, "ask:signin")).toBe("Asks the farmer to sign in");
 		expect(optionLabel(TEST_OPTIONS.answerTypes, "ask:clarify")).toBe("Asks the farmer to clarify");
-		expect(optionLabel(TEST_OPTIONS.groups, "old_group")).toBe("old_group");
+		expect(optionLabel(TEST_OPTIONS.categories, "old_feature")).toBe("old_feature");
 		const choices = filterChoices(TEST_OPTIONS.answerTypes, ["vet", "ask:farmer_code", ""]);
 		expect(choices.map((c) => c.value)).toEqual(["answer", "book", "vet", "ask:farmer_code"]);
 	});
 
 	it("counts an empty list as no filter", () => {
 		expect(hasFilters(EMPTY_FILTERS)).toBe(false);
-		expect(hasFilters({ ...EMPTY_FILTERS, tags: ["weather"] })).toBe(true);
+		expect(hasFilters({ ...EMPTY_FILTERS, caseTypes: ["edge_case"] })).toBe(true);
 		expect(hasFilters({ ...EMPTY_FILTERS, persona: "doctor" })).toBe(true);
 	});
 
