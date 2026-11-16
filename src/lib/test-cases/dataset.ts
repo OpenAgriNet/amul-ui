@@ -30,7 +30,7 @@ export type DatasetItem = {
 	};
 	metadata?: {
 		received_at?: string;
-		label?: { group?: string; answer_type?: string };
+		label?: { category?: string; answer_type?: string };
 	};
 };
 
@@ -38,11 +38,13 @@ export type DatasetItem = {
 export type DatasetRow = {
 	id: string;
 	receivedAt: string;
-	group: string;
+	// The feature the labeller filed the case under. "" until it has run.
+	category: string;
 	answerType: string;
+	// The features the tester picked, as hints for the labeller.
 	tags: string[];
 	caseTypes: string[];
-	// The farmer's last question: the one the case's label is about.
+	// The farmer's last question: the one the answer type is about.
 	question: string;
 	questionCount: number;
 	tester: string;
@@ -77,12 +79,12 @@ export function toRow(item: DatasetItem): DatasetRow {
 	return {
 		id: item.id,
 		receivedAt: text(item.metadata?.received_at),
-		group: text(item.metadata?.label?.group),
+		category: text(item.metadata?.label?.category),
 		answerType: text(item.metadata?.label?.answer_type),
 		tags: list(input.tags),
 		caseTypes: list(input.case_types),
-		// The labeller files a chat under the farmer's last question, so the table names the
-		// case by it too. The opened row shows the whole chat.
+		// The answer type is about the farmer's last question, so the table names the case
+		// by it. The opened row shows the whole chat.
 		question: questions[questions.length - 1]?.content ?? "",
 		questionCount: questions.length,
 		tester: text(input.submitted_by),
@@ -116,10 +118,9 @@ export type DatasetFilters = {
 	q: string;
 	// Only the Question column.
 	question: string;
-	group: string;
-	// A case can have several tags and types, so these pick several: any of them matches.
-	tags: string[];
+	category: string;
 	answerType: string;
+	// A case can have several types, so this picks several: any of them matches.
 	caseTypes: string[];
 	turns: string;
 	tester: string;
@@ -132,8 +133,7 @@ export type DatasetFilters = {
 export const EMPTY_FILTERS: DatasetFilters = {
 	q: "",
 	question: "",
-	group: "",
-	tags: [],
+	category: "",
 	answerType: "",
 	caseTypes: [],
 	turns: "",
@@ -148,6 +148,15 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 const contains = (haystack: string, needle: string) => haystack.toLowerCase().includes(needle);
 
+// A case counts under the labeller's category. Until it is labelled it counts under each
+// feature its tester tagged, so it can be found by feature before then.
+const inCategory = (row: DatasetRow, category: string) =>
+	category === NOT_LABELLED
+		? !row.category
+		: row.category
+			? row.category === category
+			: row.tags.includes(category);
+
 export function filterRows(
 	rows: DatasetRow[],
 	filters: DatasetFilters,
@@ -160,13 +169,11 @@ export function filterRows(
 	return rows.filter((row) => {
 		const time = Date.parse(row.receivedAt);
 		return (
-			(!filters.group ||
-				(filters.group === NOT_LABELLED ? !row.group : row.group === filters.group)) &&
+			(!filters.category || inCategory(row, filters.category)) &&
 			(!filters.answerType ||
 				(filters.answerType === NOT_LABELLED
 					? !row.answerType
 					: row.answerType === filters.answerType)) &&
-			(filters.tags.length === 0 || filters.tags.some((tag) => row.tags.includes(tag))) &&
 			(filters.caseTypes.length === 0 || filters.caseTypes.some((type) => row.caseTypes.includes(type))) &&
 			(!turnRange || (row.questionCount >= turnRange.min && row.questionCount <= turnRange.max)) &&
 			(!filters.tester || row.tester === filters.tester) &&

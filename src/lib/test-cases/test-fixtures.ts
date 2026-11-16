@@ -54,11 +54,7 @@ export const TEST_OPTIONS: TestCaseOptions = {
 	],
 	caseTypes: CASE_TYPES,
 	tags: FEATURE_TAGS,
-	groups: [
-		{ value: "ai", label: "AI", hint: "Artificial insemination." },
-		{ value: "vet-health", label: "Vet & health", hint: "Animal health, feed and treatment." },
-		{ value: "milk", label: "Milk", hint: "Milk pouring records, price and payments." }
-	],
+	categories: FEATURE_TAGS,
 	answerTypes: [
 		{ value: "answer", label: "Answers", hint: "It answers." },
 		{ value: "book", label: "Books an AI call", hint: "It books an AI call." },
