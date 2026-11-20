@@ -248,17 +248,9 @@ function Turns({
 										turn.role === "user" ? "text-[#017A38]" : "text-[#C53030]"
 									)}
 								/>
-								<div className="min-w-0 flex-1">
-									<p className="break-words whitespace-pre-wrap text-gray-800">
-										{turn.content || dash}
-									</p>
-									{turn.originalContent !== undefined && (
-										<p className="mt-1 text-xs break-words whitespace-pre-wrap text-gray-500">
-											<span className="font-medium text-amber-800">Bot said:</span>{" "}
-											{turn.originalContent}
-										</p>
-									)}
-								</div>
+								<p className="min-w-0 flex-1 wrap-break-word whitespace-pre-wrap text-gray-800">
+									{turn.content || dash}
+								</p>
 							</li>
 						);
 					})}
@@ -347,7 +339,7 @@ export function DatasetView({ options }: { options: TestCaseOptions }) {
 			title: "Question",
 			width: "16rem",
 			cell: (row) => (
-				<span className="line-clamp-2 break-words text-gray-900" title={row.question}>
+				<span className="line-clamp-2 wrap-break-word text-gray-900" title={row.question}>
 					{row.question || dash}
 				</span>
 			)
@@ -524,7 +516,7 @@ export function DatasetView({ options }: { options: TestCaseOptions }) {
 					<div className="overflow-x-auto">
 						{/* table-fixed: column widths come from the colgroup, not from the rows shown,
 						    so the columns stay put as filters change. */}
-						<table className="w-full min-w-[78rem] table-fixed border-collapse text-left text-sm">
+						<table className="w-full min-w-312 table-fixed border-collapse text-left text-sm">
 							<colgroup>
 								{columns.map((column) => (
 									<col
