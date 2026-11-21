@@ -4,12 +4,14 @@ import { environment } from "@/lib/config/environment";
 export type UiFlags = {
 	testCaseEntry: boolean;
 	doctorPersonaSelector: boolean;
+	// #593: the backend answers web chat with AG-UI events. Off until the backend says so.
+	chatAgui: boolean;
 };
 
 const FLAGS_TIMEOUT_MS = 3000;
 
 // Off until the backend says otherwise.
-export const useUiFlags = create<UiFlags>(() => ({ testCaseEntry: false, doctorPersonaSelector: false }));
+export const useUiFlags = create<UiFlags>(() => ({ testCaseEntry: false, doctorPersonaSelector: false, chatAgui: false }));
 
 export const getUiFlags = (): UiFlags => useUiFlags.getState();
 
@@ -23,8 +25,12 @@ export function loadUiFlags(): Promise<UiFlags> {
 		try {
 			const response = await fetch(`${environment.apiUrl}/api/ui-flags/`, { signal: AbortSignal.timeout(FLAGS_TIMEOUT_MS) });
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
-			const { test_case_entry, doctor_persona_selector } = (await response.json()) as Record<string, unknown>;
-			useUiFlags.setState({ testCaseEntry: test_case_entry === true, doctorPersonaSelector: doctor_persona_selector === true });
+			const { test_case_entry, doctor_persona_selector, chat_agui_enabled } = (await response.json()) as Record<string, unknown>;
+			useUiFlags.setState({
+				testCaseEntry: test_case_entry === true,
+				doctorPersonaSelector: doctor_persona_selector === true,
+				chatAgui: chat_agui_enabled === true
+			});
 		} catch (error) {
 			console.warn("UI flags unavailable, leaving the flagged features off", error);
 			loading = null;

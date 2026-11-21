@@ -4,6 +4,7 @@ import { ChatMessage } from "./chat-types";
 import { SystemBubble } from "./system-bubble";
 import { TextBubble } from "./text-bubble";
 import { MessageChrome } from "../message-chrome";
+import { InteractiveControls } from "./interactive";
 
 /* eslint-disable no-unused-vars */
 type BubbleProps = { message: ChatMessage; onQuickReply?: (payload: string) => void };
@@ -22,6 +23,7 @@ export function Bubble({ message }: BubbleProps) {
 			return (
 				<MessageChrome role={message.role}>
 					<CardBubble message={message} />
+					<InteractiveControls messageId={message.id} />
 				</MessageChrome>
 			);
 		// case "quick_replies":
