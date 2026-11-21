@@ -10,6 +10,14 @@ import type { QuickAction } from ".";
 
 const BUNDLES: Record<string, any> = { en: enData, gu: guData, hi: hiData, bn: bnData, mr: mrData, pa: paData };
 const AI_MARKER: Record<string, string> = { mr: "रेतन", pa: "ਗਰਭਦਾਨ" };
+const FODDER_MARKER: Record<string, string> = {
+	en: "fodder",
+	gu: "ચારો",
+	hi: "चारा",
+	bn: "পশুখাদ্য",
+	mr: "चारा",
+	pa: "ਚਾਰਾ"
+};
 
 // Mirrors the i18n lookup the chat screen passes in: dotted keys, and the key
 // itself back when nothing defines it.
@@ -61,12 +69,13 @@ describe("welcome quick actions", () => {
 		expect(bundle.fixedQuestions).not.toContain(weatherCard.title);
 	});
 
-	// AMUL-118: the animal-details question is the second fixed card. It is also
-	// in the random pool, so it has to match that entry exactly for the pool to
-	// drop it; otherwise the random tail could show it a second time.
-	it.each(Object.keys(BUNDLES))("puts the animal-details question second among the fixed cards, once (%s)", (lang) => {
+	// AMUL-118: the animal-details question comes right after Earnings. AMUL-128
+	// put the fodder question first, so that is now the third fixed card. It is
+	// also in the random pool, so it has to match that entry exactly for the pool
+	// to drop it; otherwise the random tail could show it a second time.
+	it.each(Object.keys(BUNDLES))("puts the animal-details question right after Earnings, once (%s)", (lang) => {
 		const bundle = BUNDLES[lang];
-		const animalDetails = bundle.fixedQuestions[1];
+		const animalDetails = bundle.fixedQuestions[2];
 		// mr and pa spell artificial insemination out instead of writing "AI".
 		expect(animalDetails).toContain(AI_MARKER[lang] ?? "AI");
 		expect(bundle.questions).toContain(animalDetails);
@@ -74,8 +83,34 @@ describe("welcome quick actions", () => {
 		for (let i = 0; i < 20; i++) {
 			const titles = buildQuickActions(makeT(bundle)).map((action) => action.title);
 			const fixedCards = titles.filter((title) => bundle.fixedQuestions.includes(title));
-			expect(fixedCards[1]).toBe(animalDetails);
+			expect(fixedCards[2]).toBe(animalDetails);
 			expect(titles.filter((title) => title === animalDetails)).toHaveLength(1);
+		}
+	});
+
+	// AMUL-128: the fodder question is the first card below the "more useful
+	// questions" launcher(s), ahead of Earnings. It replaced biogas and the random
+	// last card (which could show a deworming question), so the screen ends on the
+	// last fixed question and nothing from the random pool is shown.
+	it.each(Object.keys(BUNDLES))("puts the fodder question right below the FAQ cards, with no biogas or random card (%s)", (lang) => {
+		const bundle = BUNDLES[lang];
+		const fodder = bundle.fixedQuestions[0];
+		expect(fodder).toContain(FODDER_MARKER[lang]);
+
+		for (let i = 0; i < 20; i++) {
+			const actions = buildQuickActions(makeT(bundle));
+			const lastFaq = actions.map((action) => action.kind).lastIndexOf("open_faq_panel");
+			const card = actions[lastFaq + 1];
+			if (!card) throw new Error(`no card below the FAQ cards for ${lang}`);
+			expect(card.title).toBe(fodder);
+			expect(card.kind).toBe("ask");
+			expect(card.icon).toBe("cow");
+			expect(actions[lastFaq + 2]?.title).toBe(bundle.fixedQuestions[1]);
+
+			const titles = actions.map((action) => action.title);
+			expect(titles.filter((title) => title === fodder)).toHaveLength(1);
+			expect(titles.slice(lastFaq + 1)).toEqual(bundle.fixedQuestions);
+			expect(titles.some((title) => /biogas|બાયોગેસ|बायोगैस|बायोगॅस|বায়োগ্যাস|ਬਾਇਓਗੈਸ/i.test(title))).toBe(false);
 		}
 	});
 });
