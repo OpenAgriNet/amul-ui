@@ -101,6 +101,11 @@ class ApiService {
     return this.authToken;
   }
 
+  /** Same handling the GET chat stream gives a 401, for callers that use fetch(). */
+  handleUnauthorized(): void {
+    this.redirectToErrorPage();
+  }
+
   private refreshAuthToken(): void {
     this.authToken = this.getAuthToken();
     if (this.authToken) {
