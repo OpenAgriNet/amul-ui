@@ -89,8 +89,10 @@ type ChatStore = {
 };
 /* eslint-enable no-unused-vars */
 
-// AMUL-72/AMUL-118: ten questions plus the "more useful questions" card.
-const QUICK_ACTION_COUNT = 11;
+// AMUL-128: nine questions plus the "more useful questions" card. The fodder
+// question replaced biogas and the random last card, so every card is pinned,
+// FAQ or fixed.
+const QUICK_ACTION_COUNT = 10;
 // AMUL-87: the third pinned slot is the weather question, which has to sit
 // above the FAQ card rather than with the fixed questions below it.
 const PINNED_ACTION_COUNT = 3;
