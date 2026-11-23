@@ -16,6 +16,7 @@ import type { BaseEvent } from "@ag-ui/core";
 import { ChatRequestError, runChatTurn } from "@/lib/agui/adapter";
 import { aguiApiUrl, getAguiFetch, shouldUseAguiTransport } from "@/lib/agui/transport";
 import { applySnapshot, emptyUiState, readAmulUiSnapshot } from "@/lib/agui/state";
+import { aguiErrorText, GENERIC_CHAT_ERROR } from "@/lib/agui/errors";
 import {
 	AGUI_CUSTOM_ARTIFACTS,
 	AGUI_CUSTOM_UI_ERROR,
@@ -385,12 +386,17 @@ async function runAguiTurn(operation: ChatOperation, ctx: AguiTurnContext, fallb
 					}
 				} else if (e.name === AGUI_CUSTOM_UI_ERROR) {
 					const value = e.value as ChatError | undefined;
-					store.setState({ toast: { message: value?.error?.message || GENERIC_ERROR, type: "error" } });
+					store.setState({
+						toast: { message: aguiErrorText(translations, ctx.language, value?.error?.code, value?.error?.message), type: "error" }
+					});
 				}
 				break;
 			}
 			case "RUN_ERROR":
-				store.setState({ toast: { message: String(e.message || GENERIC_ERROR), type: "error" } });
+				// The backend sends CUSTOM amul.ui_error first; this repeats the same text.
+				store.setState({
+					toast: { message: aguiErrorText(translations, ctx.language, e.code, e.message ? String(e.message) : null), type: "error" }
+				});
 				break;
 			default:
 				break;
@@ -425,12 +431,11 @@ async function runAguiTurn(operation: ChatOperation, ctx: AguiTurnContext, fallb
 	}
 }
 
-const GENERIC_ERROR = "Sorry, there was an error processing your request. Please try again.";
-
 /** Toast for a failed pick or command; the control itself stays as the server left it. */
-function reportAguiError(error: unknown) {
+function reportAguiError(error: unknown, language: string) {
 	console.error("Interactive chat request failed:", error);
-	const message = error instanceof ChatRequestError && error.body?.error.message ? error.body.error.message : GENERIC_ERROR;
+	const body = error instanceof ChatRequestError ? error.body : null;
+	const message = body ? aguiErrorText(translations, language, body.error.code, body.error.message) : GENERIC_CHAT_ERROR;
 	useChatStore.setState({ toast: { message, type: "error" } });
 }
 
@@ -700,7 +705,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 				}));
 				try { telemetry.logErrorEvent(questionId, currentSession, "Rate limit error (429)"); } catch (e) { console.warn("Telemetry failed (error event)", e); }
 			} else {
-				set({ toast: { message: "Sorry, there was an error processing your request. Please try again.", type: "error" } });
+				const aguiBody = error instanceof ChatRequestError ? error.body : null;
+				set({
+					toast: {
+						message: aguiBody ? aguiErrorText(translations, language, aguiBody.error.code, aguiBody.error.message) : GENERIC_CHAT_ERROR,
+						type: "error"
+					}
+				});
 				try { telemetry.logErrorEvent(questionId, currentSession, String(error)); } catch (e) { console.warn("Telemetry failed (error event)", e); }
 			}
 		}
@@ -714,7 +725,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 		try {
 			await runAguiTurn({ kind: "ui_action", action }, { language, sessionId, persona, isStale });
 		} catch (error) {
-			if (!isStale()) reportAguiError(error);
+			if (!isStale()) reportAguiError(error, language);
 		} finally {
 			if (!isStale()) set({ submittingComponentId: null, isAssistantTyping: false });
 		}
@@ -731,7 +742,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 				{ language, sessionId, persona, isStale }
 			);
 		} catch (error) {
-			if (!isStale()) reportAguiError(error);
+			if (!isStale()) reportAguiError(error, language);
 		} finally {
 			if (!isStale()) set({ isAssistantTyping: false });
 		}

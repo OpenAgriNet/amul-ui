@@ -469,6 +469,24 @@
     "deductions": "Deductions",
     "changeAccount": "Change account",
     "litresUnit": "L",
-    "dailyMilk": "Milk per day (litres)"
+    "dailyMilk": "Milk per day (litres)",
+    "errors": {
+      "STALE_COMPONENT": "This choice was already used or has changed.",
+      "STALE_STATE": "The chat has changed. Please try again.",
+      "COMPONENT_NOT_FOUND": "This choice has expired. Please start a new chat.",
+      "SESSION_LIMIT": "This chat is full. Please start a new chat.",
+      "SESSION_BUSY": "Your last request is still being handled. Please try again in a moment.",
+      "RUN_IN_PROGRESS": "Your last request is still being handled. Please try again in a moment.",
+      "RUN_ID_CONFLICT": "This request was already sent. Please try again.",
+      "RUN_ALREADY_RECORDED": "This request was already sent. Please try again.",
+      "RUN_INTERRUPTED": "This request was interrupted. Please try again.",
+      "STATE_UNAVAILABLE": "The service is busy right now. Please try again in a little while.",
+      "ACCOUNTS_UNAVAILABLE": "Your accounts can't be loaded right now. Please try again later.",
+      "MILK_UNAVAILABLE": "Milk records can't be loaded right now. Please try again later.",
+      "NO_FARMER_ACCOUNT": "No milk account was found for your registered mobile number.",
+      "INVALID_OPTION": "Please choose one of the accounts shown.",
+      "INVALID_DATE_RANGE": "The end date can be at most 31 days after the start date.",
+      "UNSUPPORTED_ACTION": "This action isn't available."
+    }
   }
 }

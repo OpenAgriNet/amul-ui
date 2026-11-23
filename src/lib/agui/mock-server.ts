@@ -141,7 +141,8 @@ export function createMockChatServer(options: MockOptions = {}) {
 		status: "pending",
 		kind: "date_range",
 		purpose: "milk_period",
-		constraints: { date_format: "YYYY-MM-DD", max_difference_days: MAX_DAYS, max_date: toIsoDate(new Date()) },
+		// Like the real backend: no min_date / max_date today.
+		constraints: { date_format: "YYYY-MM-DD", max_difference_days: MAX_DAYS },
 		selected: null
 	});
 

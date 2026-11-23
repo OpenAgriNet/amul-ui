@@ -37,16 +37,21 @@ export function MilkDateRange({ component }: { readonly component: DateRangeComp
 	const [range, setRange] = useState<DateRange | undefined>();
 
 	const maxDays = component.constraints.max_difference_days;
-	const maxDate = useMemo(() => {
-		const today = new Date();
-		const limit = component.constraints.max_date ? fromIsoDate(component.constraints.max_date) : today;
-		return limit < today ? limit : today;
-	}, [component.constraints.max_date]);
-	const minDate = component.constraints.min_date ? fromIsoDate(component.constraints.min_date) : undefined;
+	// Only the backend's bounds are enforced (#593, Q6): no history or future-date
+	// limit is assumed when min_date / max_date are absent.
+	const { min_date: minIso, max_date: maxIso } = component.constraints;
+	const minDate = useMemo(() => (minIso ? fromIsoDate(minIso) : undefined), [minIso]);
+	const maxDate = useMemo(() => (maxIso ? fromIsoDate(maxIso) : undefined), [maxIso]);
+	const today = useMemo(() => new Date(), []);
+	// Presets end today, or at max_date when that is earlier.
+	const presetEnd = maxDate && maxDate < today ? maxDate : today;
 
 	const presets = useMemo(
-		() => buildPresets(maxDate).filter((p) => (!minDate || p.from >= minDate) && isRangeAllowed(p.from, p.to, maxDays)),
-		[maxDate, minDate, maxDays]
+		() =>
+			buildPresets(presetEnd).filter(
+				(p) => (!minDate || p.from >= minDate) && (!maxDate || p.to <= maxDate) && isRangeAllowed(p.from, p.to, maxDays)
+			),
+		[presetEnd, minDate, maxDate, maxDays]
 	);
 
 	if (component.status !== "pending") {
@@ -67,7 +72,8 @@ export function MilkDateRange({ component }: { readonly component: DateRangeComp
 	const submitting = submittingId === component.id;
 
 	// Once a start is picked, days past the limit are greyed out so the farmer can't pick them.
-	const disabled: Matcher[] = [{ after: maxDate }];
+	const disabled: Matcher[] = [];
+	if (maxDate) disabled.push({ after: maxDate });
 	if (minDate) disabled.push({ before: minDate });
 	if (from && !range?.to) disabled.push({ after: addDays(from, maxDays) });
 
@@ -116,7 +122,7 @@ export function MilkDateRange({ component }: { readonly component: DateRangeComp
 					selected={range}
 					onSelect={setRange}
 					disabled={busy ? true : disabled}
-					defaultMonth={maxDate}
+					defaultMonth={presetEnd}
 					endMonth={maxDate}
 					startMonth={minDate}
 					locale={CALENDAR_LOCALES[language] ?? enIN}
