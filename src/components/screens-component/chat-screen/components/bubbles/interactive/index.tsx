@@ -1,18 +1,30 @@
 import { useMemo } from "react";
 import { useChatStore } from "@/hooks/store/chat";
 import { componentsForMessage } from "@/lib/agui/state";
+export { onlyRepeatsControlTitle } from "@/lib/agui/state";
+import type { UIComponent } from "@/lib/agui/types";
 import { AccountChoice } from "./account-choice";
 import { MilkChart } from "./milk-chart";
 import { MilkDateRange } from "./milk-date-range";
+import { AttachedToBubble } from "./shared";
 
 /** The controls the backend attached to one assistant message (#593). */
-export function InteractiveControls({ messageId }: { readonly messageId: string }) {
+export function useMessageComponents(messageId: string): UIComponent[] {
 	const amulUi = useChatStore((s) => s.amulUi);
-	const components = useMemo(() => componentsForMessage(amulUi, messageId), [amulUi, messageId]);
+	return useMemo(() => componentsForMessage(amulUi, messageId), [amulUi, messageId]);
+}
+
+export function InteractiveControls({
+	components,
+	attached = true
+}: {
+	readonly components: UIComponent[];
+	readonly attached?: boolean;
+}) {
 	if (components.length === 0) return null;
 
 	return (
-		<>
+		<AttachedToBubble.Provider value={attached}>
 			{components.map((component) => {
 				switch (component.kind) {
 					case "choice":
@@ -26,6 +38,6 @@ export function InteractiveControls({ messageId }: { readonly messageId: string 
 						return null;
 				}
 			})}
-		</>
+		</AttachedToBubble.Provider>
 	);
 }

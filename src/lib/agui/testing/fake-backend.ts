@@ -1,9 +1,9 @@
-// A stand-in for the backend's POST /api/chat/ while it is being built.
-// It follows the #593 contract: one operation per request, AG-UI events over
-// SSE, full STATE_SNAPSHOTs, and 409/422 errors before the stream starts.
-// Turn it on with VITE_AGUI_MOCK=true. It is never used otherwise.
+// Test-only fake of the backend's POST /api/chat/ (OpenAgriNet/amul-oan-api#593).
+// It follows the contract: one operation per request, AG-UI events over SSE,
+// full STATE_SNAPSHOTs, and 409/422 errors before the stream starts. Only the
+// adapter tests import it; the app never does.
 
-import { addDays, daysBetween, fromIsoDate, toIsoDate } from "./state";
+import { addDays, daysBetween, fromIsoDate, toIsoDate } from "../state";
 import type {
 	AguiRequestBody,
 	AmulUIState,
@@ -13,7 +13,7 @@ import type {
 	DateRangeComponent,
 	MilkResult,
 	UIComponent
-} from "./types";
+} from "../types";
 
 const MAX_DAYS = 31;
 

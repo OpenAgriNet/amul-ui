@@ -37,12 +37,13 @@ export function MilkChart({ component }: { readonly component: ChartComponent })
 
 	return (
 		<ControlCard>
-			<div className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+			<div className="mb-3 flex flex-col items-start gap-1.5">
 				<div className="min-w-0">
 					<p className="text-sm font-semibold text-foreground">{component.title || label("milkRecords")}</p>
 					<p className="text-xs text-muted-foreground">{formatRange(data.period.fromdate, data.period.todate, language)}</p>
 				</div>
-				<span className="max-w-full truncate rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
+				{/* The backend's label (name · society · member code) is long; let it wrap rather than cut it off. */}
+				<span className="max-w-full break-words rounded-lg bg-secondary px-2.5 py-1 text-xs font-semibold leading-snug text-secondary-foreground">
 					{data.account.label}
 				</span>
 			</div>
@@ -63,7 +64,7 @@ export function MilkChart({ component }: { readonly component: ChartComponent })
 						<figcaption className="mb-1 text-xs font-medium text-muted-foreground">{label("dailyMilk")}</figcaption>
 						<div className="h-44 w-full">
 							<ResponsiveContainer width="100%" height="100%">
-								<BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+								<BarChart data={chartData} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
 									<CartesianGrid vertical={false} stroke="var(--border)" />
 									<XAxis
 										dataKey="day"
@@ -73,7 +74,7 @@ export function MilkChart({ component }: { readonly component: ChartComponent })
 										minTickGap={8}
 										tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
 									/>
-									<YAxis tickLine={false} axisLine={false} width={44} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
+									<YAxis tickLine={false} axisLine={false} width={40} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
 									<Tooltip
 										cursor={{ fill: "var(--muted)", opacity: 0.4 }}
 										contentStyle={{
@@ -110,14 +111,14 @@ export function MilkChart({ component }: { readonly component: ChartComponent })
 						<CollapsibleContent>
 							<div className="mt-2 max-h-72 overflow-auto rounded-lg border border-border">
 								<table className="w-full text-xs tabular-nums">
-									<thead className="sticky top-0 bg-muted text-left text-muted-foreground">
+									<thead className="text-left text-muted-foreground">
 										<tr>
-											<th className="px-2 py-1.5 font-semibold">{label("date")}</th>
-											<th className="px-2 py-1.5 font-semibold">{label("shift")}</th>
-											<th className="px-2 py-1.5 text-right font-semibold">{label("litres")}</th>
-											<th className="px-2 py-1.5 text-right font-semibold">{label("fat")}</th>
-											<th className="px-2 py-1.5 text-right font-semibold">{label("snf")}</th>
-											<th className="px-2 py-1.5 text-right font-semibold">₹</th>
+											<th className="sticky top-0 z-10 bg-card px-2 py-1.5 shadow-[inset_0_-1px_0_var(--border)] font-semibold">{label("date")}</th>
+											<th className="sticky top-0 z-10 bg-card px-2 py-1.5 shadow-[inset_0_-1px_0_var(--border)] font-semibold">{label("shift")}</th>
+											<th className="sticky top-0 z-10 bg-card px-2 py-1.5 shadow-[inset_0_-1px_0_var(--border)] text-right font-semibold">{label("litres")}</th>
+											<th className="sticky top-0 z-10 bg-card px-2 py-1.5 shadow-[inset_0_-1px_0_var(--border)] text-right font-semibold">{label("fat")}</th>
+											<th className="sticky top-0 z-10 bg-card px-2 py-1.5 shadow-[inset_0_-1px_0_var(--border)] text-right font-semibold">{label("snf")}</th>
+											<th className="sticky top-0 z-10 bg-card px-2 py-1.5 shadow-[inset_0_-1px_0_var(--border)] text-right font-semibold">₹</th>
 										</tr>
 									</thead>
 									<tbody>

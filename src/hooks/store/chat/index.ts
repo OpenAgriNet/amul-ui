@@ -14,7 +14,7 @@ import { parseChatWire, type ChatArtifact } from "@/lib/chat-artifacts";
 import type { FAQCategoryId } from "@/components/screens-component/chat-screen/config";
 import type { BaseEvent } from "@ag-ui/core";
 import { ChatRequestError, runChatTurn } from "@/lib/agui/adapter";
-import { aguiApiUrl, getAguiFetch, shouldUseAguiTransport } from "@/lib/agui/transport";
+import { aguiApiUrl, shouldUseAguiTransport } from "@/lib/agui/transport";
 import { applySnapshot, emptyUiState, readAmulUiSnapshot } from "@/lib/agui/state";
 import { aguiErrorText, GENERIC_CHAT_ERROR } from "@/lib/agui/errors";
 import {
@@ -413,8 +413,7 @@ async function runAguiTurn(operation: ChatOperation, ctx: AguiTurnContext, fallb
 				operation,
 				sourceLang: ctx.language,
 				targetLang: ctx.language,
-				persona: getUiFlags().doctorPersonaSelector ? ctx.persona : undefined,
-				fetchFn: await getAguiFetch()
+				persona: getUiFlags().doctorPersonaSelector ? ctx.persona : undefined
 			},
 			{
 				onEvent,

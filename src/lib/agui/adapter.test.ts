@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BaseEvent } from "@ag-ui/core";
 import { buildRequestBody, ChatRequestError, runChatTurn, type FetchFn } from "./adapter";
-import { createMockChatServer } from "./mock-server";
+import { createMockChatServer } from "./testing/fake-backend";
 import { applySnapshot, emptyUiState, readAmulUiSnapshot } from "./state";
 import type { AmulUIState, ChatOperation } from "./types";
 
@@ -49,7 +49,7 @@ describe("buildRequestBody", () => {
 	});
 });
 
-describe("runChatTurn against the mock server", () => {
+describe("runChatTurn against the fake backend", () => {
 	it("runs the whole milk flow: account, dates, chart", async () => {
 		// Split every SSE frame into 7 pieces to check the SDK reassembles them.
 		const server = createMockChatServer({ chunkDelayMs: 0, fragments: 7 });

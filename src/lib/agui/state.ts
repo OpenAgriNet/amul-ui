@@ -30,12 +30,40 @@ export function componentsForMessage(state: AmulUIState, messageId: string): UIC
 	return state.components.filter((component) => component.message_id === messageId);
 }
 
+const normalise = (text: string) => text.trim().replace(/[.:!?।]+$/u, "").toLowerCase();
+
+/**
+ * The backend anchors every control to a short assistant message. When that
+ * message only repeats a control's title ("Milk records"), showing it as its
+ * own bubble duplicates the title, so the bubble is left out.
+ */
+export function onlyRepeatsControlTitle(body: string, components: UIComponent[]): boolean {
+	if (components.length === 0) return false;
+	const text = normalise(body);
+	return text === "" || components.some((c) => normalise(c.title) === text);
+}
+
 /** "YYYY-MM-DD" in local time, matching what the farmer picked on the calendar. */
 export function toIsoDate(date: Date): string {
 	const y = date.getFullYear();
 	const m = String(date.getMonth() + 1).padStart(2, "0");
 	const d = String(date.getDate()).padStart(2, "0");
 	return `${y}-${m}-${d}`;
+}
+
+/**
+ * A real calendar date from "YYYY-MM-DD" (chart, period) or the provider's
+ * "DD-MM-YYYY" / "DD/MM/YYYY" (detail rows). Null for anything else, including
+ * impossible dates like 31-02-2026.
+ */
+export function parseProviderDate(value: string): Date | null {
+	const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+	const dmy = /^(\d{2})[-/](\d{2})[-/](\d{4})$/.exec(value);
+	const [y, m, d] = iso ? [iso[1], iso[2], iso[3]] : dmy ? [dmy[3], dmy[2], dmy[1]] : [];
+	if (!y || !m || !d) return null;
+	const date = new Date(Number(y), Number(m) - 1, Number(d));
+	const real = date.getFullYear() === Number(y) && date.getMonth() === Number(m) - 1 && date.getDate() === Number(d);
+	return real ? date : null;
 }
 
 export function fromIsoDate(value: string): Date {
