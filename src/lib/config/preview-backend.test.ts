@@ -39,12 +39,30 @@ const throwingStorage = {
 const LOCAL_ORIGIN = "http://localhost:5173";
 
 describe("isPreviewSwitchEnabled", () => {
-	it("is on only for the dev API", () => {
+	it("is on only for the dev API, on our own pages", () => {
 		expect(isPreviewSwitchEnabled(DEV_API_ORIGIN, LOCAL_ORIGIN)).toBe(true);
 		expect(isPreviewSwitchEnabled(`${DEV_API_ORIGIN}/`, LOCAL_ORIGIN)).toBe(true);
+		// As the dev UI is built: the dev API as base URL, on its two addresses.
+		expect(isPreviewSwitchEnabled(DEV_API_ORIGIN, DEV_UI_ORIGIN)).toBe(true);
+		expect(isPreviewSwitchEnabled(DEV_API_ORIGIN, "https://chat.dev.amulai.in")).toBe(true);
+		expect(isPreviewSwitchEnabled(DEV_API_ORIGIN, "http://127.0.0.1:3000")).toBe(true);
 	});
 
-	it("is on for the dev UI calling its own /api, as dev is built", () => {
+	it("is off on Amul's domains and any other site, even with the dev API", () => {
+		for (const origin of [
+			"https://dev-amulmitra.amul.com",
+			"https://amul.com",
+			"https://amulai.in",
+			"https://previews.dev.amulai.in",
+			"https://dev.amulai.in.evil.example",
+			"https://evil.example",
+			""
+		]) {
+			expect(isPreviewSwitchEnabled(DEV_API_ORIGIN, origin)).toBe(false);
+		}
+	});
+
+	it("is on for the dev UI calling its own /api (no base URL)", () => {
 		expect(isPreviewSwitchEnabled("", DEV_UI_ORIGIN)).toBe(true);
 		expect(isPreviewSwitchEnabled(undefined, DEV_UI_ORIGIN)).toBe(true);
 	});
@@ -130,8 +148,14 @@ describe("isValidPreviewName", () => {
 describe("resolveApiBaseUrl", () => {
 	it("uses the picked preview in a dev build", () => {
 		const storage = memoryStorage({ [PREVIEW_STORAGE_KEY]: "pr-552" });
-		expect(resolveApiBaseUrl(DEV_API_ORIGIN, storage)).toBe("https://pr-552-backend.dev.amulai.in");
-		// The dev UI has no base URL: its own /api becomes the preview's.
+		expect(resolveApiBaseUrl(DEV_API_ORIGIN, storage, DEV_UI_ORIGIN)).toBe(
+			"https://pr-552-backend.dev.amulai.in"
+		);
+		// The same build on Amul's domain stays on dev, whatever this browser picked.
+		expect(resolveApiBaseUrl(DEV_API_ORIGIN, storage, "https://dev-amulmitra.amul.com")).toBe(
+			DEV_API_ORIGIN
+		);
+		// A dev UI with no base URL: its own /api becomes the preview's.
 		expect(resolveApiBaseUrl("", storage, DEV_UI_ORIGIN)).toBe(
 			"https://pr-552-backend.dev.amulai.in"
 		);
