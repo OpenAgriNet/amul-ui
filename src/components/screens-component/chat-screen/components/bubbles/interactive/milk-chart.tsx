@@ -4,7 +4,7 @@ import { ChevronDown, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useChatStore } from "@/hooks/store/chat";
-import type { ChartComponent } from "@/lib/agui/types";
+import type { ChartComponent, MilkResult } from "@/lib/agui/types";
 import { cn } from "@/lib/utils";
 import { ControlCard, formatDate, formatNumber, formatRange, formatRupees, useLabel } from "./shared";
 
@@ -13,6 +13,27 @@ function Stat({ label, value }: { readonly label: string; readonly value: string
 		<div className="min-w-0 rounded-xl bg-muted/50 px-3 py-2 dark:bg-muted/30">
 			<div className="truncate text-xs text-muted-foreground">{label}</div>
 			<div className="truncate text-base font-bold tabular-nums text-foreground">{value}</div>
+		</div>
+	);
+}
+
+function Deductions({ deductions }: { readonly deductions: MilkResult["deductions"] }) {
+	const { label, language } = useLabel();
+	if (deductions.length === 0) return null;
+	return (
+		<div className="mt-3">
+			<p className="mb-1 text-xs font-semibold text-muted-foreground">{label("deductions")}</p>
+			<ul className="flex flex-col gap-1 text-xs">
+				{deductions.map((d, i) => (
+					<li key={`${d.date}-${i}`} className="flex justify-between gap-2 rounded-md bg-muted/50 px-2 py-1.5 tabular-nums">
+						<span className="min-w-0 truncate">
+							{d.account_name ?? "–"}
+							{d.date ? <span className="text-muted-foreground"> · {formatDate(d.date, language, false)}</span> : null}
+						</span>
+						<span className="shrink-0 font-semibold">{d.amount === null ? "–" : formatRupees(d.amount)}</span>
+					</li>
+				))}
+			</ul>
 		</div>
 	);
 }
@@ -43,13 +64,17 @@ export function MilkChart({ component }: { readonly component: ChartComponent })
 					<p className="text-xs text-muted-foreground">{formatRange(data.period.fromdate, data.period.todate, language)}</p>
 				</div>
 				{/* The backend's label (name · society · member code) is long; let it wrap rather than cut it off. */}
-				<span className="max-w-full break-words rounded-lg bg-secondary px-2.5 py-1 text-xs font-semibold leading-snug text-secondary-foreground">
+				<span className="max-w-full wrap-break-word rounded-lg bg-secondary px-2.5 py-1 text-xs font-semibold leading-snug text-secondary-foreground">
 					{data.account.label}
 				</span>
 			</div>
 
 			{data.status === "no_records" || !summary ? (
-				<p className="rounded-xl bg-muted/50 px-3 py-4 text-center text-sm text-muted-foreground">{label("noRecords")}</p>
+				<>
+					<p className="rounded-xl bg-muted/50 px-3 py-4 text-center text-sm text-muted-foreground">{label("noRecords")}</p>
+					{/* A period can have deductions without milk entries; show them anyway. */}
+					<Deductions deductions={data.deductions} />
+				</>
 			) : (
 				<>
 					<div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -135,22 +160,7 @@ export function MilkChart({ component }: { readonly component: ChartComponent })
 									</tbody>
 								</table>
 							</div>
-							{data.deductions.length > 0 ? (
-								<div className="mt-3">
-									<p className="mb-1 text-xs font-semibold text-muted-foreground">{label("deductions")}</p>
-									<ul className="flex flex-col gap-1 text-xs">
-										{data.deductions.map((d, i) => (
-											<li key={`${d.date}-${i}`} className="flex justify-between gap-2 rounded-md bg-muted/50 px-2 py-1.5 tabular-nums">
-												<span className="min-w-0 truncate">
-													{d.account_name ?? "–"}
-													{d.date ? <span className="text-muted-foreground"> · {formatDate(d.date, language, false)}</span> : null}
-												</span>
-												<span className="shrink-0 font-semibold">{d.amount === null ? "–" : formatRupees(d.amount)}</span>
-											</li>
-										))}
-									</ul>
-								</div>
-							) : null}
+							<Deductions deductions={data.deductions} />
 						</CollapsibleContent>
 					</Collapsible>
 				</>
