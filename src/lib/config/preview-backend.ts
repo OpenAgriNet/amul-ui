@@ -3,12 +3,13 @@
  *
  * A preview backend runs one amul-oan-api pull request at https://<name>-backend.dev.amulai.in and
  * is listed by the previews panel. A tester picks one in the dev UI; the choice lives in this
- * browser's localStorage only, so it never changes what anyone else sees. Only a build that uses the
- * dev API shows it: one that names https://api.dev.amulai.in, or the dev UI at https://dev.amulai.in
- * calling its own /api (no API base URL, as dev is built). Prod, and local dev through the Vite
- * proxy (also no base URL, but on localhost), ignore the switch entirely, whatever is stored. So
- * does the dev UI inside another site's frame (partners may embed it): it stays on dev and shows
- * no switch.
+ * browser's localStorage only, so it never changes what anyone else sees. It shows only on our own
+ * pages (the dev UI at dev.amulai.in or chat.dev.amulai.in, or a local run), never on Amul's
+ * domains such as dev-amulmitra.amul.com nor inside another site's frame, and only in a build that
+ * uses the dev API: one that names https://api.dev.amulai.in (as the dev UI is built), or the dev UI
+ * at https://dev.amulai.in calling its own /api (no API base URL). Prod, and local dev through the
+ * Vite proxy (no base URL, on localhost), ignore the switch entirely, whatever is stored. Anywhere
+ * it does not show, the app stays on dev.
  *
  * The API base URL is read once when the app loads, so a change takes effect on the next reload.
  */
@@ -59,16 +60,34 @@ export function isFramed(
 	}
 }
 
+// Our own pages, where the switch may show. The same build also serves Amul's domains (such as
+// dev-amulmitra.amul.com), which never get it.
+const SWITCH_PAGE_HOSTS = new Set([
+	"dev.amulai.in",
+	"chat.dev.amulai.in",
+	"localhost",
+	"127.0.0.1"
+]);
+
+/** True for a page of ours: the dev UI, its chat address, or a local run. */
+export function isOwnPage(origin: string): boolean {
+	try {
+		return SWITCH_PAGE_HOSTS.has(new URL(origin).hostname);
+	} catch {
+		return false;
+	}
+}
+
 /**
- * True only for a build that uses the dev API, on a page of its own: its base URL is exactly the dev
- * API, or it has none (it calls its own /api) and this page is the dev UI. Never inside a frame.
+ * True only for a build that uses the dev API, on a page of ours that is not inside a frame: its
+ * base URL is exactly the dev API, or it has none (it calls its own /api) and this page is the dev UI.
  */
 export function isPreviewSwitchEnabled(
 	apiBaseUrl: string | undefined,
 	origin: string = pageOrigin(),
 	framed: boolean = isFramed()
 ): boolean {
-	if (framed) return false;
+	if (framed || !isOwnPage(origin)) return false;
 	if (!apiBaseUrl) return origin === DEV_UI_ORIGIN;
 	try {
 		const url = new URL(apiBaseUrl);
