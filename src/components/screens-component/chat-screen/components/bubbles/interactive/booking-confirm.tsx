@@ -42,7 +42,7 @@ function SummaryRows({ summary }: { readonly summary: BookingSummary }) {
 			{rows.map(([term, value, detail]) => (
 				<div key={term} className="flex items-start justify-between gap-3 py-2 text-sm">
 					<dt className="shrink-0 text-muted-foreground">{term}</dt>
-					<dd className="min-w-0 break-words text-right">
+					<dd className="min-w-0 wrap-break-word text-right">
 						<span className="block font-semibold text-foreground">{value}</span>
 						{detail ? <span className="block text-xs text-muted-foreground tabular-nums">{detail}</span> : null}
 					</dd>
@@ -76,7 +76,9 @@ function PendingConfirm({ component }: { readonly component: ConfirmComponent })
 		void editAiBooking(component.id, component.workflow_id, field, language);
 	};
 
-	const outline = "h-9 rounded-xl border-primary/40 px-2 text-sm font-semibold text-primary hover:bg-primary/5 hover:text-primary";
+	// Labels may wrap to two lines on a phone ("Change technician" does not fit in English).
+	const outline =
+		"h-auto min-h-9 whitespace-normal rounded-xl border-primary/40 px-2 py-1.5 text-sm leading-tight font-semibold text-primary hover:bg-primary/5 hover:text-primary";
 
 	return (
 		<ControlCard>
@@ -90,11 +92,11 @@ function PendingConfirm({ component }: { readonly component: ConfirmComponent })
 			<div className="mt-2 grid grid-cols-2 gap-2">
 				<Button variant="outline" className={outline} disabled={busy} onClick={() => edit("technician")}>
 					{spinner("technician") ?? <Pencil className="h-4 w-4" aria-hidden="true" />}
-					<span className="truncate">{label("changeTechnician")}</span>
+					<span>{label("changeTechnician")}</span>
 				</Button>
 				<Button variant="outline" className={outline} disabled={busy} onClick={() => edit("species")}>
 					{spinner("species") ?? <Pencil className="h-4 w-4" aria-hidden="true" />}
-					<span className="truncate">{label("changeAnimal")}</span>
+					<span>{label("changeAnimal")}</span>
 				</Button>
 			</div>
 			<Button
