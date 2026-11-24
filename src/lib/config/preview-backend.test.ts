@@ -5,6 +5,7 @@ import {
 	PREVIEW_LIST_URL,
 	PREVIEW_STORAGE_KEY,
 	fetchPreviewBackends,
+	isFramed,
 	isPreviewSwitchEnabled,
 	isValidPreviewName,
 	parsePreviewList,
@@ -74,6 +75,31 @@ describe("isPreviewSwitchEnabled", () => {
 		// A prod API stays prod even if the page were on the dev UI's address.
 		expect(isPreviewSwitchEnabled("https://api.prod.amulai.in", DEV_UI_ORIGIN)).toBe(false);
 	});
+
+	it("is off inside another site's frame, even for the dev UI", () => {
+		expect(isPreviewSwitchEnabled("", DEV_UI_ORIGIN, true)).toBe(false);
+		expect(isPreviewSwitchEnabled(DEV_API_ORIGIN, LOCAL_ORIGIN, true)).toBe(false);
+		expect(isPreviewSwitchEnabled("", DEV_UI_ORIGIN, false)).toBe(true);
+	});
+});
+
+describe("isFramed", () => {
+	it("tells a page of its own from one in a frame", () => {
+		const page = {};
+		expect(isFramed({ self: page, top: page })).toBe(false);
+		expect(isFramed({ self: page, top: {} })).toBe(true);
+		expect(isFramed(undefined)).toBe(false);
+	});
+
+	it("assumes a frame when the top page cannot be read", () => {
+		const guarded = {
+			self: {},
+			get top(): unknown {
+				throw new Error("blocked");
+			}
+		};
+		expect(isFramed(guarded)).toBe(true);
+	});
 });
 
 describe("isValidPreviewName", () => {
@@ -106,8 +132,12 @@ describe("resolveApiBaseUrl", () => {
 		const storage = memoryStorage({ [PREVIEW_STORAGE_KEY]: "pr-552" });
 		expect(resolveApiBaseUrl(DEV_API_ORIGIN, storage)).toBe("https://pr-552-backend.dev.amulai.in");
 		// The dev UI has no base URL: its own /api becomes the preview's.
-		expect(resolveApiBaseUrl("", storage, DEV_UI_ORIGIN)).toBe("https://pr-552-backend.dev.amulai.in");
+		expect(resolveApiBaseUrl("", storage, DEV_UI_ORIGIN)).toBe(
+			"https://pr-552-backend.dev.amulai.in"
+		);
 		expect(resolveApiBaseUrl("", memoryStorage(), DEV_UI_ORIGIN)).toBe("");
+		// Inside a partner's frame the dev UI stays on dev, whatever this browser picked.
+		expect(resolveApiBaseUrl("", storage, DEV_UI_ORIGIN, true)).toBe("");
 	});
 
 	it("keeps dev when nothing valid is stored or storage is unusable", () => {

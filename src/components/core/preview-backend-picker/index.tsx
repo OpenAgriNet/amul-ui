@@ -29,7 +29,8 @@ function optionLabel({ name, title }: PreviewBackend): string {
 
 /**
  * Dev-only switch, bottom-left: which backend this browser's chat talks to. Renders nothing in a
- * build that does not use the dev API, or when the browser cannot store the choice.
+ * build that does not use the dev API, inside another site's frame, or when the browser cannot
+ * store the choice.
  * The rules live in lib/config/preview-backend.ts.
  */
 export function PreviewBackendPicker() {

@@ -6,7 +6,9 @@
  * browser's localStorage only, so it never changes what anyone else sees. Only a build that uses the
  * dev API shows it: one that names https://api.dev.amulai.in, or the dev UI at https://dev.amulai.in
  * calling its own /api (no API base URL, as dev is built). Prod, and local dev through the Vite
- * proxy (also no base URL, but on localhost), ignore the switch entirely, whatever is stored.
+ * proxy (also no base URL, but on localhost), ignore the switch entirely, whatever is stored. So
+ * does the dev UI inside another site's frame (partners may embed it): it stays on dev and shows
+ * no switch.
  *
  * The API base URL is read once when the app loads, so a change takes effect on the next reload.
  */
@@ -43,14 +45,30 @@ export function pageOrigin(): string {
 	}
 }
 
+/** True when this page runs inside another page's frame; when that cannot be told, assume it does. */
+export function isFramed(
+	win: { readonly self: unknown; readonly top: unknown } | undefined = typeof window !== "undefined"
+		? window
+		: undefined
+): boolean {
+	if (!win) return false;
+	try {
+		return win.self !== win.top;
+	} catch {
+		return true;
+	}
+}
+
 /**
- * True only for a build that uses the dev API: its base URL is exactly the dev API, or it has none
- * (it calls its own /api) and this page is the dev UI.
+ * True only for a build that uses the dev API, on a page of its own: its base URL is exactly the dev
+ * API, or it has none (it calls its own /api) and this page is the dev UI. Never inside a frame.
  */
 export function isPreviewSwitchEnabled(
 	apiBaseUrl: string | undefined,
-	origin: string = pageOrigin()
+	origin: string = pageOrigin(),
+	framed: boolean = isFramed()
 ): boolean {
+	if (framed) return false;
 	if (!apiBaseUrl) return origin === DEV_UI_ORIGIN;
 	try {
 		const url = new URL(apiBaseUrl);
@@ -108,9 +126,10 @@ export function writeSelectedPreview(
 export function resolveApiBaseUrl(
 	apiBaseUrl: string,
 	storage: ReadableStorage | null | undefined,
-	origin: string = pageOrigin()
+	origin: string = pageOrigin(),
+	framed: boolean = isFramed()
 ): string {
-	if (!isPreviewSwitchEnabled(apiBaseUrl, origin)) return apiBaseUrl;
+	if (!isPreviewSwitchEnabled(apiBaseUrl, origin, framed)) return apiBaseUrl;
 	const name = readSelectedPreview(storage);
 	return name ? previewBackendUrl(name) : apiBaseUrl;
 }
