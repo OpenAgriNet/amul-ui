@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
 	DEV_API_ORIGIN,
+	DEV_UI_ORIGIN,
 	PREVIEW_LIST_URL,
 	PREVIEW_STORAGE_KEY,
 	fetchPreviewBackends,
@@ -34,10 +35,17 @@ const throwingStorage = {
 	}
 };
 
+const LOCAL_ORIGIN = "http://localhost:5173";
+
 describe("isPreviewSwitchEnabled", () => {
 	it("is on only for the dev API", () => {
-		expect(isPreviewSwitchEnabled(DEV_API_ORIGIN)).toBe(true);
-		expect(isPreviewSwitchEnabled(`${DEV_API_ORIGIN}/`)).toBe(true);
+		expect(isPreviewSwitchEnabled(DEV_API_ORIGIN, LOCAL_ORIGIN)).toBe(true);
+		expect(isPreviewSwitchEnabled(`${DEV_API_ORIGIN}/`, LOCAL_ORIGIN)).toBe(true);
+	});
+
+	it("is on for the dev UI calling its own /api, as dev is built", () => {
+		expect(isPreviewSwitchEnabled("", DEV_UI_ORIGIN)).toBe(true);
+		expect(isPreviewSwitchEnabled(undefined, DEV_UI_ORIGIN)).toBe(true);
 	});
 
 	it("is off for prod, local proxy builds and anything unusual", () => {
@@ -51,8 +59,20 @@ describe("isPreviewSwitchEnabled", () => {
 			"https://api.dev.amulai.in.evil.example",
 			"not a url"
 		]) {
-			expect(isPreviewSwitchEnabled(url)).toBe(false);
+			expect(isPreviewSwitchEnabled(url, LOCAL_ORIGIN)).toBe(false);
 		}
+		// No base URL counts only on the dev UI itself.
+		for (const origin of [
+			"",
+			"http://dev.amulai.in",
+			"https://dev.amulai.in.evil.example",
+			"https://amulai.in",
+			"https://previews.dev.amulai.in"
+		]) {
+			expect(isPreviewSwitchEnabled("", origin)).toBe(false);
+		}
+		// A prod API stays prod even if the page were on the dev UI's address.
+		expect(isPreviewSwitchEnabled("https://api.prod.amulai.in", DEV_UI_ORIGIN)).toBe(false);
 	});
 });
 
@@ -85,6 +105,9 @@ describe("resolveApiBaseUrl", () => {
 	it("uses the picked preview in a dev build", () => {
 		const storage = memoryStorage({ [PREVIEW_STORAGE_KEY]: "pr-552" });
 		expect(resolveApiBaseUrl(DEV_API_ORIGIN, storage)).toBe("https://pr-552-backend.dev.amulai.in");
+		// The dev UI has no base URL: its own /api becomes the preview's.
+		expect(resolveApiBaseUrl("", storage, DEV_UI_ORIGIN)).toBe("https://pr-552-backend.dev.amulai.in");
+		expect(resolveApiBaseUrl("", memoryStorage(), DEV_UI_ORIGIN)).toBe("");
 	});
 
 	it("keeps dev when nothing valid is stored or storage is unusable", () => {
@@ -101,7 +124,10 @@ describe("resolveApiBaseUrl", () => {
 		expect(resolveApiBaseUrl("https://api.prod.amulai.in", storage)).toBe(
 			"https://api.prod.amulai.in"
 		);
-		expect(resolveApiBaseUrl("", storage)).toBe("");
+		expect(resolveApiBaseUrl("", storage, LOCAL_ORIGIN)).toBe("");
+		expect(resolveApiBaseUrl("https://api.prod.amulai.in", storage, DEV_UI_ORIGIN)).toBe(
+			"https://api.prod.amulai.in"
+		);
 	});
 });
 

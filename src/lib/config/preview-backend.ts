@@ -3,14 +3,16 @@
  *
  * A preview backend runs one amul-oan-api pull request at https://<name>-backend.dev.amulai.in and
  * is listed by the previews panel. A tester picks one in the dev UI; the choice lives in this
- * browser's localStorage only, so it never changes what anyone else sees. A build whose API is not
- * the dev API (prod, or local dev through the Vite proxy) ignores the switch entirely, whatever is
- * stored.
+ * browser's localStorage only, so it never changes what anyone else sees. Only a build that uses the
+ * dev API shows it: one that names https://api.dev.amulai.in, or the dev UI at https://dev.amulai.in
+ * calling its own /api (no API base URL, as dev is built). Prod, and local dev through the Vite
+ * proxy (also no base URL, but on localhost), ignore the switch entirely, whatever is stored.
  *
  * The API base URL is read once when the app loads, so a change takes effect on the next reload.
  */
 
 export const DEV_API_ORIGIN = "https://api.dev.amulai.in";
+export const DEV_UI_ORIGIN = "https://dev.amulai.in";
 export const PREVIEW_LIST_URL = "https://previews.dev.amulai.in/api/backends";
 export const PREVIEW_STORAGE_KEY = "dev_preview_backend";
 
@@ -32,9 +34,24 @@ export type PreviewBackend = {
 type ReadableStorage = Pick<Storage, "getItem">;
 type WritableStorage = Pick<Storage, "setItem" | "removeItem">;
 
-/** True only for a build whose API base URL is exactly the dev API. */
-export function isPreviewSwitchEnabled(apiBaseUrl: string | undefined): boolean {
-	if (!apiBaseUrl) return false;
+/** This page's origin, or "" when there is none (outside a browser). */
+export function pageOrigin(): string {
+	try {
+		return typeof window !== "undefined" ? window.location.origin : "";
+	} catch {
+		return "";
+	}
+}
+
+/**
+ * True only for a build that uses the dev API: its base URL is exactly the dev API, or it has none
+ * (it calls its own /api) and this page is the dev UI.
+ */
+export function isPreviewSwitchEnabled(
+	apiBaseUrl: string | undefined,
+	origin: string = pageOrigin()
+): boolean {
+	if (!apiBaseUrl) return origin === DEV_UI_ORIGIN;
 	try {
 		const url = new URL(apiBaseUrl);
 		return url.origin === DEV_API_ORIGIN && url.pathname === "/" && !url.search && !url.hash;
@@ -90,9 +107,10 @@ export function writeSelectedPreview(
 /** The API base URL this browser should use: the picked preview in a dev build, else unchanged. */
 export function resolveApiBaseUrl(
 	apiBaseUrl: string,
-	storage: ReadableStorage | null | undefined
+	storage: ReadableStorage | null | undefined,
+	origin: string = pageOrigin()
 ): string {
-	if (!isPreviewSwitchEnabled(apiBaseUrl)) return apiBaseUrl;
+	if (!isPreviewSwitchEnabled(apiBaseUrl, origin)) return apiBaseUrl;
 	const name = readSelectedPreview(storage);
 	return name ? previewBackendUrl(name) : apiBaseUrl;
 }
