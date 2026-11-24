@@ -22,6 +22,8 @@ import {
 	AGUI_CUSTOM_UI_ERROR,
 	type AmulUIState,
 	type ArtifactsEventValue,
+	type BookingField,
+	type ChatCommand,
 	type ChatError,
 	type ChatOperation,
 	type UIAction
@@ -82,6 +84,10 @@ type ChatStore = {
 	submittingComponentId: string | null;
 	submitUiAction: (action: UIAction, language: string) => Promise<void>;
 	changeMilkAccount: (language: string) => Promise<void>;
+	/** #636 Change technician / Change animal; `componentId` is the control whose button was pressed. */
+	editAiBooking: (componentId: string, workflowId: string, field: BookingField, language: string) => Promise<void>;
+	/** #636 Cancel at any pending booking stage. */
+	cancelAiBooking: (componentId: string, workflowId: string, language: string) => Promise<void>;
 	setPersona: (persona: ChatPersona) => void;
 	initializeSession: (user: any) => void;
 	sendText: (text: string, language: string) => Promise<void>;
@@ -430,6 +436,28 @@ async function runAguiTurn(operation: ChatOperation, ctx: AguiTurnContext, fallb
 	}
 }
 
+/**
+ * Sends a command (change account, edit or cancel a booking) with the latest
+ * state_revision. `componentId` marks the control whose button started it.
+ */
+async function sendCommand(
+	build: (stateRevision: number) => ChatCommand,
+	language: string,
+	componentId: string | null = null
+): Promise<void> {
+	const { sessionId, persona, isAssistantTyping, submittingComponentId, amulUi } = useChatStore.getState();
+	if (!sessionId || isAssistantTyping || submittingComponentId) return;
+	useChatStore.setState({ submittingComponentId: componentId, isAssistantTyping: true, suggestions: [] });
+	const isStale = () => useChatStore.getState().sessionId !== sessionId || useChatStore.getState().persona !== persona;
+	try {
+		await runAguiTurn({ kind: "command", command: build(amulUi.state_revision) }, { language, sessionId, persona, isStale });
+	} catch (error) {
+		if (!isStale()) reportAguiError(error, language);
+	} finally {
+		if (!isStale()) useChatStore.setState({ submittingComponentId: null, isAssistantTyping: false });
+	}
+}
+
 /** Toast for a failed pick or command; the control itself stays as the server left it. */
 function reportAguiError(error: unknown, language: string) {
 	console.error("Interactive chat request failed:", error);
@@ -731,20 +759,23 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 	},
 
 	changeMilkAccount: async (language) => {
-		const { sessionId, persona, isAssistantTyping, amulUi } = get();
-		if (!sessionId || isAssistantTyping) return;
-		set({ isAssistantTyping: true, suggestions: [] });
-		const isStale = () => get().sessionId !== sessionId || get().persona !== persona;
-		try {
-			await runAguiTurn(
-				{ kind: "command", command: { kind: "change_milk_account", state_revision: amulUi.state_revision } },
-				{ language, sessionId, persona, isStale }
-			);
-		} catch (error) {
-			if (!isStale()) reportAguiError(error, language);
-		} finally {
-			if (!isStale()) set({ isAssistantTyping: false });
-		}
+		await sendCommand((state_revision) => ({ kind: "change_milk_account", state_revision }), language);
+	},
+
+	editAiBooking: async (componentId, workflowId, field, language) => {
+		await sendCommand(
+			(state_revision) => ({ kind: "edit_ai_booking", workflow_id: workflowId, state_revision, field }),
+			language,
+			componentId
+		);
+	},
+
+	cancelAiBooking: async (componentId, workflowId, language) => {
+		await sendCommand(
+			(state_revision) => ({ kind: "cancel_ai_booking", workflow_id: workflowId, state_revision }),
+			language,
+			componentId
+		);
 	},
 
 	fetchSuggestionsForMessage: async (messageId) => {

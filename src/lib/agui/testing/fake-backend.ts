@@ -1,4 +1,5 @@
-// Test-only fake of the backend's POST /api/chat/ (OpenAgriNet/amul-oan-api#593).
+// Test-only fake of the backend's POST /api/chat/ (OpenAgriNet/amul-oan-api#593,
+// plus the AI booking flow proposed on #636).
 // It follows the contract: one operation per request, AG-UI events over SSE,
 // full STATE_SNAPSHOTs, and 409/422 errors before the stream starts. Only the
 // adapter tests import it; the app never does.
@@ -7,9 +8,12 @@ import { addDays, daysBetween, fromIsoDate, toIsoDate } from "../state";
 import type {
 	AguiRequestBody,
 	AmulUIState,
+	BookingOutcome,
+	BookingOutcomeStatus,
 	ChartComponent,
 	ChatError,
 	ChoiceComponent,
+	ConfirmComponent,
 	DateRangeComponent,
 	MilkResult,
 	UIComponent
@@ -24,6 +28,24 @@ const ACCOUNTS = [
 
 const MILK_WORDS = ["milk", "દૂધ", "दूध", "दुध", "দুধ", "ਦੁੱਧ"];
 
+const SPECIES = [
+	{ id: "cow", label: "Cow" },
+	{ id: "buffalo", label: "Buffalo" }
+];
+
+// Option ids are the fake's own, like the backend's, not the API's technician ids.
+// Descriptions are the technician's mobile, as in #637. These numbers are made up.
+const TECHNICIANS = [
+	{ id: "tech_1", label: "Ramesh Patel", description: "90000 00001" },
+	{ id: "tech_2", label: "Suresh Desai", description: "90000 00002" },
+	// No longer available when picked: the backend shows the technician picker again.
+	{ id: "tech_gone", label: "Mahesh Shah", description: "90000 00003" }
+];
+
+const BOOKING_ACCOUNT = "Anand Milk Society · 1042";
+
+const BOOKING_WORDS = ["insemination", "technician", "બીજદાન", "ગર્ભાધાન", "गर्भाधान", "रेतन"];
+
 type Event = Record<string, unknown> & { type: string };
 
 type MockOptions = {
@@ -31,6 +53,8 @@ type MockOptions = {
 	chunkDelayMs?: number;
 	/** Split every event across this many network chunks, to exercise reassembly. */
 	fragments?: number;
+	/** What a confirmed booking returns. Defaults to "confirmed" with a ticket. */
+	bookingOutcome?: BookingOutcomeStatus;
 };
 
 let counter = 0;
@@ -111,6 +135,9 @@ export function createMockChatServer(options: MockOptions = {}) {
 	const fragments = Math.max(1, options.fragments ?? 1);
 
 	let ui: AmulUIState = { version: 1, state_revision: 0, selected_milk_account: null, components: [] };
+	/** Booking choices so far, by workflow. */
+	const bookings = new Map<string, { species?: string; technician?: string }>();
+	let bookingsMade = 0;
 
 	const publish = (components: UIComponent[], selected = ui.selected_milk_account) => {
 		ui = { ...ui, state_revision: ui.state_revision + 1, selected_milk_account: selected, components };
@@ -155,12 +182,15 @@ export function createMockChatServer(options: MockOptions = {}) {
 		];
 	}
 
-	function stream(body: AguiRequestBody, events: Event[]): Response {
-		const all: Event[] = [
-			{ type: "RUN_STARTED", threadId: body.threadId, runId: body.runId },
-			...events,
-			{ type: "RUN_FINISHED", threadId: body.threadId, runId: body.runId }
-		];
+	/** `failure` ends the run like the backend does: CUSTOM amul.ui_error, then RUN_ERROR. */
+	function stream(body: AguiRequestBody, events: Event[], failure?: ChatError): Response {
+		const end: Event[] = failure
+			? [
+					{ type: "CUSTOM", name: "amul.ui_error", value: failure },
+					{ type: "RUN_ERROR", code: failure.error.code, message: failure.error.message }
+				]
+			: [{ type: "RUN_FINISHED", threadId: body.threadId, runId: body.runId }];
+		const all: Event[] = [{ type: "RUN_STARTED", threadId: body.threadId, runId: body.runId }, ...events, ...end];
 		const encoder = new TextEncoder();
 		const readable = new ReadableStream<Uint8Array>({
 			async start(controller) {
@@ -187,6 +217,133 @@ export function createMockChatServer(options: MockOptions = {}) {
 
 	const snapshot = (): Event => ({ type: "STATE_SNAPSHOT", snapshot: { amul_ui: ui } });
 
+	const base = (messageId: string, workflowId: string, title: string) => ({
+		id: nextId("cmp"),
+		workflow_id: workflowId,
+		message_id: messageId,
+		revision: 1,
+		title,
+		status: "pending" as const
+	});
+
+	const speciesPicker = (messageId: string, workflowId: string): ChoiceComponent => ({
+		...base(messageId, workflowId, "Choose the animal"),
+		kind: "choice",
+		purpose: "ai_species",
+		options: SPECIES.map(({ id, label }) => ({ id, label, description: null })),
+		selected: null
+	});
+
+	const technicianPicker = (messageId: string, workflowId: string): ChoiceComponent => ({
+		...base(messageId, workflowId, "Choose an AI technician"),
+		kind: "choice",
+		purpose: "ai_technician",
+		options: TECHNICIANS.map(({ id, label, description }) => ({ id, label, description })),
+		selected: null
+	});
+
+	const confirmCard = (messageId: string, workflowId: string): ConfirmComponent => {
+		const booking = bookings.get(workflowId)!;
+		const technician = TECHNICIANS.find((t) => t.id === booking.technician)!;
+		const species = SPECIES.find((sp) => sp.id === booking.species)!;
+		return {
+			...base(messageId, workflowId, "Confirm AI visit"),
+			kind: "confirm",
+			purpose: "ai_booking",
+			summary: {
+				account_label: BOOKING_ACCOUNT,
+				technician: { id: technician.id, label: technician.label, description: technician.description },
+				species: species.id as "cow" | "buffalo",
+				species_label: species.label
+			},
+			selected: null,
+			outcome: null
+		};
+	};
+
+	const markSubmitted = (target: UIComponent, selected: unknown, extra: object = {}): UIComponent =>
+		({ ...target, status: "submitted", revision: target.revision + 1, selected, ...extra }) as UIComponent;
+
+	/** Expires this booking's pending controls; milk controls are left alone, as in #637. */
+	const expireBooking = (components: UIComponent[], workflowId: string): UIComponent[] =>
+		components.map((c) =>
+			c.workflow_id === workflowId && c.status === "pending" ? ({ ...c, status: "expired", revision: c.revision + 1 } as UIComponent) : c
+		);
+
+	function startBookingWorkflow(body: AguiRequestBody, text: string): Response {
+		const messageId = nextId("msg");
+		const workflowId = nextId("wf");
+		// Like the agent: the species is passed only when the farmer named it.
+		const species = SPECIES.find((sp) => text.toLowerCase().includes(sp.id))?.id;
+		bookings.set(workflowId, { species });
+		const others = [...bookings.keys()].filter((id) => id !== workflowId);
+		const components = others.reduce((all, id) => expireBooking(all, id), ui.components);
+		publish([...components, technicianPicker(messageId, workflowId)]);
+		return stream(body, [...textEvents(messageId, "Sure. Which technician should come?"), snapshot()]);
+	}
+
+	function handleBookingAction(
+		body: AguiRequestBody,
+		target: UIComponent,
+		action: NonNullable<AguiRequestBody["forwardedProps"]["ui_action"]>
+	): Response {
+		const workflowId = target.workflow_id;
+		const booking = bookings.get(workflowId)!;
+		const messageId = nextId("msg");
+		const replace = (submitted: UIComponent, ...added: UIComponent[]) =>
+			ui.components.map((c) => (c.id === target.id ? submitted : c)).concat(added);
+
+		if (target.kind === "choice" && action.kind === "choice" && target.purpose === "ai_technician") {
+			const technician = TECHNICIANS.find((t) => t.id === action.value.option_id);
+			if (!technician) return jsonError(422, "INVALID_OPTION", "Choose one of the displayed options.", target.id);
+			if (technician.id === "tech_gone") {
+				publish([...expireBooking(ui.components, workflowId), technicianPicker(messageId, workflowId)]);
+				return stream(body, [...textEvents(messageId, "That technician is no longer available. Please choose again."), snapshot()]);
+			}
+			booking.technician = technician.id;
+			const next = booking.species ? confirmCard(messageId, workflowId) : speciesPicker(messageId, workflowId);
+			publish(replace(markSubmitted(target, { option_id: technician.id }), next));
+			return stream(body, [...textEvents(messageId, next.title), snapshot()]);
+		}
+
+		if (target.kind === "choice" && action.kind === "choice" && target.purpose === "ai_species") {
+			const species = SPECIES.find((sp) => sp.id === action.value.option_id);
+			if (!species) return jsonError(422, "INVALID_OPTION", "Choose one of the displayed options.", target.id);
+			booking.species = species.id;
+			const confirm = confirmCard(messageId, workflowId);
+			publish(replace(markSubmitted(target, { option_id: species.id }), confirm));
+			return stream(body, [...textEvents(messageId, confirm.title), snapshot()]);
+		}
+
+		if (target.kind === "confirm" && action.kind === "confirm") {
+			if (!action.value.confirmed) {
+				publish(expireBooking(replace(markSubmitted(target, { confirmed: false })), workflowId));
+				return stream(body, [...textEvents(messageId, "AI booking cancelled."), snapshot()]);
+			}
+			bookingsMade++;
+			const status = options.bookingOutcome ?? "confirmed";
+			const outcome: BookingOutcome = {
+				status,
+				message: {
+					confirmed: "Your AI visit is booked. The technician will contact you.",
+					rejected: "The booking service did not accept this booking.",
+					not_sent: "The booking was not sent.",
+					unconfirmed: "The booking could not be confirmed. Please don't book again right away.",
+					already_requested: "An AI visit has already been requested."
+				}[status],
+				ticket: status === "confirmed" ? `AI-${1000 + bookingsMade}` : null
+			};
+			publish(replace(markSubmitted(target, { confirmed: true }, { outcome })));
+			const failure: ChatError | undefined =
+				status === "confirmed"
+					? undefined
+					: { error: { code: `AI_BOOKING_${status.toUpperCase()}`, message: outcome.message, retryable: false } };
+			return stream(body, [...textEvents(messageId, outcome.message), snapshot()], failure);
+		}
+
+		return jsonError(422, "UNSUPPORTED_ACTION", "This control does not accept that action.", target.id);
+	}
+
 	function startMilkWorkflow(body: AguiRequestBody, intro: string): Response {
 		const messageId = nextId("msg");
 		const workflowId = nextId("wf");
@@ -202,6 +359,9 @@ export function createMockChatServer(options: MockOptions = {}) {
 
 		if (body.messages.length === 1 && !props.ui_action && !props.command) {
 			const text = body.messages[0]?.content ?? "";
+			if (BOOKING_WORDS.some((w) => text.toLowerCase().includes(w))) {
+				return startBookingWorkflow(body, text);
+			}
 			if (MILK_WORDS.some((w) => text.toLowerCase().includes(w))) {
 				return startMilkWorkflow(body, "Sure.");
 			}
@@ -217,6 +377,29 @@ export function createMockChatServer(options: MockOptions = {}) {
 			return startMilkWorkflow(body, "Okay.");
 		}
 
+		if (props.command?.kind === "edit_ai_booking" || props.command?.kind === "cancel_ai_booking") {
+			const command = props.command;
+			if (command.state_revision !== ui.state_revision) {
+				return jsonError(409, "STALE_STATE", "The chat changed. Use its latest state revision.");
+			}
+			const booking = bookings.get(command.workflow_id);
+			const pending = ui.components.some((c) => c.workflow_id === command.workflow_id && c.status === "pending");
+			if (!booking || !pending) return jsonError(409, "STALE_COMPONENT", "This booking is no longer awaiting a selection.");
+			const messageId = nextId("msg");
+			const expired = expireBooking(ui.components, command.workflow_id);
+			if (command.kind === "cancel_ai_booking") {
+				publish(expired);
+				return stream(body, [...textEvents(messageId, "AI booking cancelled."), snapshot()]);
+			}
+			// Editing needs a fresh confirmation; the other choice is kept.
+			const picker =
+				command.field === "technician" || !booking.technician
+					? technicianPicker(messageId, command.workflow_id)
+					: speciesPicker(messageId, command.workflow_id);
+			publish([...expired, picker]);
+			return stream(body, [...textEvents(messageId, picker.title), snapshot()]);
+		}
+
 		const action = props.ui_action;
 		if (!action) return jsonError(422, "INVALID_REQUEST", "Send one message, ui_action, or command.");
 
@@ -225,6 +408,8 @@ export function createMockChatServer(options: MockOptions = {}) {
 		if (target.status !== "pending" || target.revision !== action.revision) {
 			return jsonError(409, "STALE_COMPONENT", "This control was already used or has changed.", action.component_id);
 		}
+
+		if (bookings.has(target.workflow_id)) return handleBookingAction(body, target, action);
 
 		if (action.kind === "choice" && target.kind === "choice") {
 			const option = ACCOUNTS.find((a) => a.id === action.value.option_id);
@@ -274,6 +459,10 @@ export function createMockChatServer(options: MockOptions = {}) {
 		},
 		reset: () => {
 			ui = { version: 1, state_revision: 0, selected_milk_account: null, components: [] };
-		}
+			bookings.clear();
+			bookingsMade = 0;
+		},
+		/** How many bookings were actually made, to check a repeat confirm adds none. */
+		bookingsMade: () => bookingsMade
 	};
 }

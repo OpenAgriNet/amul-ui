@@ -470,6 +470,24 @@
     "changeAccount": "Change account",
     "litresUnit": "L",
     "dailyMilk": "Milk per day (litres)",
+    "choice": "Choice",
+    "technician": "Technician",
+    "animal": "Animal",
+    "booking": "Booking",
+    "confirmBooking": "Confirm booking",
+    "changeTechnician": "Change technician",
+    "changeAnimal": "Change animal",
+    "cancelBooking": "Cancel booking",
+    "bookingSent": "Sent",
+    "bookingCancelled": "Cancelled",
+    "ticket": "Ticket",
+    "outcome": {
+      "confirmed": "Booking done",
+      "rejected": "Booking not accepted",
+      "not_sent": "Booking was not sent",
+      "unconfirmed": "The booking could not be confirmed",
+      "already_requested": "A booking is already requested"
+    },
     "errors": {
       "STALE_COMPONENT": "This choice was already used or has changed.",
       "STALE_STATE": "The chat has changed. Please try again.",
@@ -486,7 +504,15 @@
       "NO_FARMER_ACCOUNT": "No milk account was found for your registered mobile number.",
       "INVALID_OPTION": "Please choose one of the accounts shown.",
       "INVALID_DATE_RANGE": "The end date can be at most 31 days after the start date.",
-      "UNSUPPORTED_ACTION": "This action isn't available."
+      "UNSUPPORTED_ACTION": "This action isn't available.",
+      "FARMER_SIGN_IN_REQUIRED": "Sign in with your registered farmer number to use this.",
+      "BOOKING_CONTEXT_UNAVAILABLE": "Your farmer details can't be loaded for booking right now. Please try again later.",
+      "TECHNICIANS_UNAVAILABLE": "AI technicians can't be loaded right now. Please try again later.",
+      "NO_AI_TECHNICIANS": "No AI technician is available for your society. Please contact your society.",
+      "AI_BOOKING_REJECTED": "The booking was not accepted.",
+      "AI_BOOKING_NOT_SENT": "The booking was not sent.",
+      "AI_BOOKING_UNCONFIRMED": "The booking could not be confirmed. Please don't book again right away.",
+      "AI_BOOKING_ALREADY_REQUESTED": "A booking has already been requested."
     }
   }
 }

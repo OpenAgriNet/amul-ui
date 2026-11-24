@@ -1,23 +1,37 @@
 import { useState } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/hooks/store/chat";
-import type { ChoiceComponent } from "@/lib/agui/types";
+import type { ChoiceComponent, ChoicePurpose } from "@/lib/agui/types";
 import { cn } from "@/lib/utils";
 import { AnsweredRow, ControlCard, useLabel } from "./shared";
 
-export function AccountChoice({ component }: { readonly component: ChoiceComponent }) {
+/** Label of the answered row ("Account: …"), by what the picker chooses. */
+const ANSWER_LABEL: Record<ChoicePurpose, string> = {
+	milk_account: "account",
+	ai_technician: "technician",
+	ai_species: "animal"
+};
+
+/**
+ * A single-choice picker: milk account (#593), AI technician or Cow/Buffalo
+ * (#636). Only the option id is sent back; the backend maps it. Booking
+ * pickers also offer Cancel, which ends the booking at this stage.
+ */
+export function ChoiceControl({ component }: { readonly component: ChoiceComponent }) {
 	const { label, language } = useLabel();
 	const submitUiAction = useChatStore((s) => s.submitUiAction);
+	const cancelAiBooking = useChatStore((s) => s.cancelAiBooking);
 	const submittingId = useChatStore((s) => s.submittingComponentId);
 	const busy = useChatStore((s) => s.isAssistantTyping);
 	const [picked, setPicked] = useState<string | null>(null);
+	const [cancelling, setCancelling] = useState(false);
 
 	if (component.status !== "pending") {
 		const chosen = component.options.find((o) => o.id === component.selected?.option_id);
 		return (
 			<AnsweredRow
-				label={label("account")}
+				label={label(ANSWER_LABEL[component.purpose] ?? "choice")}
 				value={chosen?.label ?? (component.status === "expired" ? label("expired") : label("notAnswered"))}
 				expired={component.status === "expired"}
 			/>
@@ -25,8 +39,10 @@ export function AccountChoice({ component }: { readonly component: ChoiceCompone
 	}
 
 	const submitting = submittingId === component.id;
+	const isBooking = component.purpose === "ai_technician" || component.purpose === "ai_species";
 	const submit = () => {
 		if (!picked) return;
+		setCancelling(false);
 		void submitUiAction(
 			{ component_id: component.id, revision: component.revision, kind: "choice", value: { option_id: picked } },
 			language
@@ -73,7 +89,7 @@ export function AccountChoice({ component }: { readonly component: ChoiceCompone
 				})}
 			</div>
 			<Button className="mt-3 h-10 w-full rounded-xl font-semibold" disabled={!picked || busy} onClick={submit}>
-				{submitting ? (
+				{submitting && !cancelling ? (
 					<>
 						<Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
 						{label("sending")}
@@ -82,6 +98,24 @@ export function AccountChoice({ component }: { readonly component: ChoiceCompone
 					label("continue")
 				)}
 			</Button>
+			{isBooking ? (
+				<Button
+					variant="ghost"
+					className="mt-1 h-9 w-full rounded-xl text-sm font-semibold text-muted-foreground"
+					disabled={busy}
+					onClick={() => {
+						setCancelling(true);
+						void cancelAiBooking(component.id, component.workflow_id, language);
+					}}
+				>
+					{submitting && cancelling ? (
+						<Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+					) : (
+						<X className="h-4 w-4" aria-hidden="true" />
+					)}
+					{label("cancelBooking")}
+				</Button>
+			) : null}
 		</ControlCard>
 	);
 }

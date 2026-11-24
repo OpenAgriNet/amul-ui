@@ -1,4 +1,5 @@
-// Types for the AG-UI chat contract proposed on OpenAgriNet/amul-oan-api#593.
+// Types for the AG-UI chat contract proposed on OpenAgriNet/amul-oan-api#593,
+// plus the AI booking additions from #636 (backend PR #637, docs/AGUI_DEVELOPMENT.md).
 // They mirror the backend's Pydantic models; when the backend publishes its
 // JSON Schema, regenerate or check these against it.
 
@@ -26,10 +27,14 @@ export type UIAction =
 			value: { confirmed: boolean };
 	  };
 
-export type ChatCommand = {
-	kind: "change_milk_account";
-	state_revision: number;
-};
+export type ChatCommand =
+	| { kind: "change_milk_account"; state_revision: number }
+	// #636: reopens the technician or animal picker; needs a fresh confirmation.
+	| { kind: "edit_ai_booking"; workflow_id: string; state_revision: number; field: BookingField }
+	// #636: cancels the booking at any pending stage.
+	| { kind: "cancel_ai_booking"; workflow_id: string; state_revision: number };
+
+export type BookingField = "technician" | "species";
 
 export type AmulRequestProps = {
 	version: 1;
@@ -76,9 +81,12 @@ export type ChoiceOption = {
 	description: string | null;
 };
 
+/** milk_account is #593; ai_technician and ai_species are #636. */
+export type ChoicePurpose = "milk_account" | "ai_technician" | "ai_species";
+
 export type ChoiceComponent = ComponentBase & {
 	kind: "choice";
-	purpose: "milk_account";
+	purpose: ChoicePurpose;
 	options: ChoiceOption[];
 	selected: { option_id: string } | null;
 };
@@ -96,10 +104,34 @@ export type DateRangeComponent = ComponentBase & {
 	selected: { fromdate: string; todate: string } | null;
 };
 
+/** #636: what the farmer is about to book. Labels are localised by the backend; names kept as the API returns them. */
+export type BookingSummary = {
+	account_label: string;
+	/** description is the technician's mobile number. */
+	technician: ChoiceOption;
+	species: "cow" | "buffalo";
+	species_label: string;
+};
+
+/** Only "confirmed" is a successful booking for this workflow. */
+export type BookingOutcomeStatus = "confirmed" | "rejected" | "not_sent" | "unconfirmed" | "already_requested";
+
+export type BookingOutcome = {
+	status: BookingOutcomeStatus;
+	message: string;
+	ticket: string | null;
+};
+
+/**
+ * #636: the booking review. After Confirm, the same component comes back
+ * submitted with its `outcome`.
+ */
 export type ConfirmComponent = ComponentBase & {
 	kind: "confirm";
-	purpose: string;
+	purpose: "ai_booking";
+	summary: BookingSummary;
 	selected: { confirmed: boolean } | null;
+	outcome: BookingOutcome | null;
 };
 
 export type MilkResult = {
