@@ -1,15 +1,18 @@
-/* Amul AI staff portal. Direction: Amul's red-and-white hoarding. One solid band of Amul red
-   (#EC1C24, the fill of the Amul AI wordmark) carries a big white greeting; the tools sit on white
-   below it, pulled up into the band. Everything else is quiet: white paper, dark warm ink, hairline
-   rules, and the chat app's butter yellow only for role badges. Light theme only. */
+/* Amul AI staff portal. Layout: a band across the top with a big greeting, the tools on white below
+   it, pulled up into the band. Palette: the farmer chat app's own pinks (file:line in each comment), so
+   the portal looks like the chat staff already know. Light theme only. */
 :root {
-	--red: #ec1c24;
-	--red-press: #c8141b;
-	--ink: #2a2522;
-	--ink-2: #5c544f;
-	--rule: #e7e2dc;
+	--pink: #ffe2e2; /* user bubble, active chips: chat text-bubble.tsx:12, config.json:11 */
+	--pink-soft: #fff2f2; /* page gradient top: global.css:347 */
+	--pink-press: #ffcccc; /* soft button hover: feedback-modal.tsx:184 */
+	--accent: #f65151; /* the chat's accent: chat-layout/index.tsx:66, config.json:8 */
+	--accent-text: #d93b3b; /* the chat's pressed red: chat-header.tsx:92; button labels in it pass AA on white */
+	--ink: #3d3d3d; /* foreground: global.css:52, config.json:12 */
+	--ink-2: #646464; /* --ink at 80% on white */
+	--rule: #e3e3e3; /* header and input borders: chat-header.tsx:76, chat-input.tsx:215 */
+	--rule-strong: #cbcbcb; /* language button border: chat-header.tsx:141 */
 	--paper: #ffffff;
-	--butter: #fef89e;
+	--shadow: 1.6px 1.6px 9.6px 0 #00000014; /* bubble shadow: text-bubble.tsx:12 */
 	--display: "Bricolage Grotesque", "Noto Sans", system-ui, sans-serif;
 	--text: "Noto Sans", system-ui, sans-serif;
 }
@@ -63,12 +66,13 @@ body {
 }
 
 a:focus-visible {
-	outline: 3px solid var(--ink);
+	outline: 3px solid var(--accent);
 	outline-offset: 3px;
 }
 
 /* Masthead: the logo and wordmark exactly as the chat app shows them, on white. */
 .masthead {
+	border-bottom: 1px solid var(--rule);
 	background: var(--paper);
 }
 
@@ -121,9 +125,9 @@ a:focus-visible {
 }
 
 .sign-out {
-	padding: 7px 14px;
-	border: 1px solid var(--ink);
-	border-radius: 6px;
+	padding: 7px 16px;
+	border: 1px solid var(--rule-strong);
+	border-radius: 999px;
 	color: var(--ink);
 	font-size: 14px;
 	font-weight: 600;
@@ -132,15 +136,15 @@ a:focus-visible {
 }
 
 .sign-out:hover {
-	background: var(--ink);
-	color: var(--paper);
+	border-color: var(--accent);
+	background: var(--pink);
 }
 
-/* The band: the one loud thing on the page. */
+/* The band: the chat's pastel pink, dark ink on it. */
 .band {
 	padding: 56px 0 152px;
-	background: var(--red);
-	color: var(--paper);
+	background: var(--pink);
+	color: var(--ink);
 }
 
 .band h1 {
@@ -190,7 +194,7 @@ main.wrap {
 	border: 1px solid var(--rule);
 	border-radius: 12px;
 	background: var(--paper);
-	box-shadow: 0 18px 40px -24px rgb(42 37 34 / 45%);
+	box-shadow: var(--shadow);
 }
 
 .shot {
@@ -198,7 +202,7 @@ main.wrap {
 	aspect-ratio: 16 / 9;
 	overflow: hidden;
 	border-bottom: 1px solid var(--rule);
-	background: #f6f3ef;
+	background: var(--pink-soft);
 }
 
 .shot img {
@@ -234,7 +238,7 @@ main.wrap {
 .badge {
 	padding: 3px 11px;
 	border-radius: 999px;
-	background: var(--butter);
+	background: var(--pink);
 	color: var(--ink);
 	font-size: 13px;
 	font-weight: 600;
@@ -247,18 +251,20 @@ main.wrap {
 	color: var(--ink-2);
 }
 
+/* The chat's primary button: a white pill with an accent border (chat-layout/index.tsx:66). */
 .open {
 	align-self: flex-start;
-	padding: 11px 20px;
-	border-radius: 6px;
-	background: var(--red);
-	color: var(--paper);
+	padding: 10px 22px;
+	border: 1px solid var(--accent);
+	border-radius: 999px;
+	background: var(--paper);
+	color: var(--accent-text);
 	font-weight: 600;
 	text-decoration: none;
 }
 
 .open:hover {
-	background: var(--red-press);
+	background: var(--pink);
 }
 
 .status {
