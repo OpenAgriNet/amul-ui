@@ -1,116 +1,318 @@
-/* Colours from the chat app's forest palette (src/styles/global.css). */
+/* Amul AI staff portal. Direction: Amul's red-and-white hoarding. One solid band of Amul red
+   (#EC1C24, the fill of the Amul AI wordmark) carries a big white greeting; the tools sit on white
+   below it, pulled up into the band. Everything else is quiet: white paper, dark warm ink, hairline
+   rules, and the chat app's butter yellow only for role badges. Light theme only. */
 :root {
-	--primary: #00bd52;
-	--primary-dark: #019444;
-	--background: #f6f6f6;
-	--foreground: #3d3d3d;
-	--muted: #6b6b6b;
-	--card: #ffffff;
-	--border: #e3e3e3;
+	--red: #ec1c24;
+	--red-press: #c8141b;
+	--ink: #2a2522;
+	--ink-2: #5c544f;
+	--rule: #e7e2dc;
+	--paper: #ffffff;
+	--butter: #fef89e;
+	--display: "Bricolage Grotesque", "Noto Sans", system-ui, sans-serif;
+	--text: "Noto Sans", system-ui, sans-serif;
+}
+
+@font-face {
+	font-family: "Bricolage Grotesque";
+	font-weight: 200 800;
+	font-style: normal;
+	font-display: swap;
+	src: url("fonts/bricolage-grotesque-latin-wght-normal.woff2") format("woff2");
+}
+
+@font-face {
+	font-family: "Noto Sans";
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+	src: url("fonts/noto-sans-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+	font-family: "Noto Sans";
+	font-weight: 600;
+	font-style: normal;
+	font-display: swap;
+	src: url("fonts/noto-sans-latin-600-normal.woff2") format("woff2");
 }
 
 * {
 	box-sizing: border-box;
 }
 
-body {
-	margin: 0;
-	background: var(--background);
-	color: var(--foreground);
-	font-family: "Noto Sans", system-ui, sans-serif;
-	font-size: 0.95rem;
+html {
+	color-scheme: light;
 }
 
-.bar {
+body {
+	margin: 0;
+	background: var(--paper);
+	color: var(--ink);
+	font-family: var(--text);
+	font-size: 16px;
+	line-height: 1.5;
+}
+
+.wrap {
+	width: 100%;
+	max-width: 1232px;
+	margin: 0 auto;
+	padding: 0 16px;
+}
+
+a:focus-visible {
+	outline: 3px solid var(--ink);
+	outline-offset: 3px;
+}
+
+/* Masthead: the logo and wordmark exactly as the chat app shows them, on white. */
+.masthead {
+	background: var(--paper);
+}
+
+.masthead-row {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 16px;
-	padding: 12px 16px;
-	background: var(--card);
-	border-bottom: 1px solid var(--border);
+	min-height: 72px;
 }
 
 .brand {
 	display: flex;
 	align-items: center;
 	gap: 10px;
+	color: var(--ink);
+	text-decoration: none;
+}
+
+.wordmark {
+	height: 32px;
+	width: auto;
+}
+
+.brand-name {
+	padding-left: 12px;
+	border-left: 1px solid var(--rule);
+	font-family: var(--display);
+	font-size: 20px;
 	font-weight: 600;
-	font-size: 1.05rem;
+	letter-spacing: -0.01em;
 }
 
 .who {
 	display: flex;
 	align-items: center;
-	gap: 14px;
+	gap: 16px;
 	min-width: 0;
+}
+
+.who[hidden] {
+	display: none;
 }
 
 .who-name {
 	overflow: hidden;
+	font-weight: 600;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
 .sign-out {
-	color: var(--primary-dark);
+	padding: 7px 14px;
+	border: 1px solid var(--ink);
+	border-radius: 6px;
+	color: var(--ink);
+	font-size: 14px;
+	font-weight: 600;
+	text-decoration: none;
 	white-space: nowrap;
 }
 
-main {
-	max-width: 960px;
-	margin: 0 auto;
-	padding: 24px 16px;
+.sign-out:hover {
+	background: var(--ink);
+	color: var(--paper);
 }
 
-h1 {
-	margin: 0 0 16px;
-	font-size: 1.25rem;
-	font-weight: 600;
+/* The band: the one loud thing on the page. */
+.band {
+	padding: 56px 0 152px;
+	background: var(--red);
+	color: var(--paper);
 }
 
-.status {
-	color: var(--muted);
+.band h1 {
+	margin: 0;
+	font-family: var(--display);
+	font-size: clamp(40px, 6vw, 72px);
+	font-weight: 750;
+	line-height: 1;
+	letter-spacing: -0.03em;
 }
 
-.status:empty {
-	display: none;
+.band p {
+	max-width: 34em;
+	margin: 18px 0 0;
+	font-size: 19px;
+	line-height: 1.45;
+}
+
+/* Tools sit on white, pulled up into the band. */
+main.wrap {
+	margin-top: -104px;
+	padding-bottom: 56px;
 }
 
 .tiles {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-	gap: 16px;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 24px;
 	margin: 0;
 	padding: 0;
 	list-style: none;
 }
 
+.tiles[data-count="1"] {
+	grid-template-columns: minmax(0, 600px);
+}
+
+.tiles[data-count="2"],
+.tiles[data-count="4"] {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .tile {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	overflow: hidden;
+	border: 1px solid var(--rule);
+	border-radius: 12px;
+	background: var(--paper);
+	box-shadow: 0 18px 40px -24px rgb(42 37 34 / 45%);
+}
+
+.shot {
+	display: block;
+	aspect-ratio: 16 / 9;
+	overflow: hidden;
+	border-bottom: 1px solid var(--rule);
+	background: #f6f3ef;
+}
+
+.shot img {
+	display: block;
+	width: 100%;
 	height: 100%;
-	padding: 18px;
-	background: var(--card);
-	border: 1px solid var(--border);
-	border-top: 4px solid var(--primary);
-	border-radius: 10px;
-	color: inherit;
+	object-fit: cover;
+	object-position: left top;
+}
+
+.tile-body {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	padding: 22px 24px 24px;
+}
+
+.tile-head {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.tile-name {
+	margin: 0;
+	font-family: var(--display);
+	font-size: 30px;
+	font-weight: 700;
+	line-height: 1.1;
+	letter-spacing: -0.02em;
+}
+
+.badge {
+	padding: 3px 11px;
+	border-radius: 999px;
+	background: var(--butter);
+	color: var(--ink);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.tile-desc {
+	flex: 1;
+	max-width: 36em;
+	margin: 10px 0 22px;
+	color: var(--ink-2);
+}
+
+.open {
+	align-self: flex-start;
+	padding: 11px 20px;
+	border-radius: 6px;
+	background: var(--red);
+	color: var(--paper);
+	font-weight: 600;
 	text-decoration: none;
 }
 
-.tile:hover,
-.tile:focus-visible {
-	border-color: var(--primary);
-	box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+.open:hover {
+	background: var(--red-press);
 }
 
-.tile strong {
-	font-size: 1.05rem;
-	color: var(--primary-dark);
+.status {
+	margin: 0;
+	padding: 28px;
+	border: 1px solid var(--rule);
+	border-radius: 12px;
+	background: var(--paper);
+	color: var(--ink-2);
 }
 
-.tile span {
-	color: var(--muted);
+.foot {
+	margin: 40px 0 0;
+	color: var(--ink-2);
+	font-size: 14px;
+}
+
+@media (max-width: 1000px) {
+	.tiles,
+	.tiles[data-count="4"] {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 680px) {
+	.tiles,
+	.tiles[data-count] {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 18px;
+	}
+
+	.band {
+		padding: 36px 0 112px;
+	}
+
+	.band p {
+		font-size: 17px;
+	}
+
+	main.wrap {
+		margin-top: -80px;
+	}
+
+	.who-name {
+		display: none;
+	}
+
+	.tile-name {
+		font-size: 26px;
+	}
+}
+
+@media (max-width: 400px) {
+	.brand-name {
+		display: none;
+	}
 }
