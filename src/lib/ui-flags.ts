@@ -4,12 +4,14 @@ import { environment } from "@/lib/config/environment";
 export type UiFlags = {
 	testCaseEntry: boolean;
 	doctorPersonaSelector: boolean;
+	// The per-message Debug panel (dev and previews with the debug view on).
+	debugView: boolean;
 };
 
 const FLAGS_TIMEOUT_MS = 3000;
 
 // Off until the backend says otherwise.
-export const useUiFlags = create<UiFlags>(() => ({ testCaseEntry: false, doctorPersonaSelector: false }));
+export const useUiFlags = create<UiFlags>(() => ({ testCaseEntry: false, doctorPersonaSelector: false, debugView: false }));
 
 export const getUiFlags = (): UiFlags => useUiFlags.getState();
 
@@ -23,8 +25,8 @@ export function loadUiFlags(): Promise<UiFlags> {
 		try {
 			const response = await fetch(`${environment.apiUrl}/api/ui-flags/`, { signal: AbortSignal.timeout(FLAGS_TIMEOUT_MS) });
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
-			const { test_case_entry, doctor_persona_selector } = (await response.json()) as Record<string, unknown>;
-			useUiFlags.setState({ testCaseEntry: test_case_entry === true, doctorPersonaSelector: doctor_persona_selector === true });
+			const { test_case_entry, doctor_persona_selector, debug_view } = (await response.json()) as Record<string, unknown>;
+			useUiFlags.setState({ testCaseEntry: test_case_entry === true, doctorPersonaSelector: doctor_persona_selector === true, debugView: debug_view === true });
 		} catch (error) {
 			console.warn("UI flags unavailable, leaving the flagged features off", error);
 			loading = null;
