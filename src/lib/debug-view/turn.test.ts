@@ -172,6 +172,24 @@ describe("search results", () => {
 		]);
 	});
 
+	it("takes the full list the backend kept for a text result, whose text may be cut", () => {
+		const searched = span("d", null, "running tool", 0, 1, {
+			"gen_ai.tool.name": "search_documents",
+			tool_response: "1. Kaira FinalShibir Book\n## Treatment:\nRemedies… (+3000 chars)",
+			"debug.documents": JSON.stringify([
+				{ title: "Kaira FinalShibir Book", source: "kaira.pdf" },
+				{ title: "EVM_Brochure_Guj (1)", source: null },
+				{ title: "Sabar_MASTITIS PREVENTION AND CONTROL", source: null }
+			])
+		});
+		expect(documentsOf(searched)).toEqual([
+			{ title: "Kaira FinalShibir Book", source: "kaira.pdf", score: null },
+			{ title: "EVM_Brochure_Guj (1)", source: null, score: null },
+			{ title: "Sabar_MASTITIS PREVENTION AND CONTROL", source: null, score: null }
+		]);
+		expect(detailOf(searched)).toBe("3 results");
+	});
+
 	it("finds them inside a results object, and gives nothing for anything else", () => {
 		const wrapped = span("w", null, "running tool", 0, 1, {
 			tool_response: JSON.stringify({ results: [{ name: "Doc A", relevance: 0.5 }] })

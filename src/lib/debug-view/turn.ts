@@ -106,9 +106,14 @@ export function labelOf(span: DebugSpan, kind: StepKind = kindOf(span)): string 
 	}
 }
 
-/** The rows of a search-like tool's result: a list of objects with a title (or name) each. */
+/**
+ * The rows of a search-like tool's result. The backend lists a text result's documents in full
+ * under debug.documents (the result itself may be cut); else a JSON result is read: a list of
+ * objects with a title (or name) each.
+ */
 export function documentsOf(span: DebugSpan): DocumentRow[] {
-	let value = parsed(span.attributes["tool_response"]);
+	const listed = parsed(span.attributes["debug.documents"]);
+	let value = Array.isArray(listed) ? listed : parsed(span.attributes["tool_response"]);
 	if (value && typeof value === "object" && !Array.isArray(value)) {
 		const holder = value as Record<string, unknown>;
 		value = holder.results ?? holder.documents ?? holder.data ?? holder.items;
