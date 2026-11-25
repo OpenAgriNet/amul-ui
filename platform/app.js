@@ -72,7 +72,6 @@ async function main() {
 			.map((app) => ({ app, role: heldRole(app.access, groups) }))
 			.filter((t) => t.role !== null);
 		const tiles = document.getElementById("tiles");
-		tiles.dataset.count = String(visible.length);
 		tiles.append(...visible.map((t) => tile(t.app, t.role)));
 		if (visible.length) {
 			status.remove();
