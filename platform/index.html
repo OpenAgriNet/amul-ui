@@ -6,24 +6,34 @@
 		<meta name="robots" content="noindex, nofollow" />
 		<title>Amul AI Platform</title>
 		<link rel="icon" href="amul-logo.svg" type="image/svg+xml" />
+		<link rel="preload" href="fonts/bricolage-grotesque-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
 		<link rel="stylesheet" href="style.css" />
 		<script src="app.js" defer></script>
 	</head>
 	<body>
-		<header class="bar">
-			<div class="brand">
-				<img src="amul-logo.svg" alt="" width="36" height="36" />
-				<span>Amul AI Platform</span>
-			</div>
-			<div class="who" id="who" hidden>
-				<span class="who-name" id="who-name"></span>
-				<a class="sign-out" href="/oauth2/sign_out?rd=%2F">Sign out</a>
+		<header class="masthead">
+			<div class="wrap masthead-row">
+				<a class="brand" href="/">
+					<img src="amul-logo.svg" alt="" width="40" height="40" />
+					<img class="wordmark" src="amul-ai-wordmark.svg" alt="Amul AI" width="99" height="32" />
+					<span class="brand-name">Platform</span>
+				</a>
+				<div class="who" id="who" hidden>
+					<span class="who-name" id="who-name"></span>
+					<a class="sign-out" href="/oauth2/sign_out?rd=%2F">Sign out</a>
+				</div>
 			</div>
 		</header>
-		<main>
-			<h1>Your tools</h1>
-			<p class="status" id="status">Loading...</p>
+		<section class="band">
+			<div class="wrap">
+				<h1 id="greeting">Amul AI staff tools</h1>
+				<p>One sign-in for every Amul AI staff tool. Open one and it signs you in with the same account.</p>
+			</div>
+		</section>
+		<main class="wrap">
+			<p class="status" id="status">Loading your tools</p>
 			<ul class="tiles" id="tiles"></ul>
+			<p class="foot">Access is given per person. If you need a tool that is not here, ask an Amul AI administrator.</p>
 		</main>
 	</body>
 </html>
