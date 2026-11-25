@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>Amul AI Platform</title>
+		<link rel="icon" href="amul-logo.svg" type="image/svg+xml" />
+		<link rel="stylesheet" href="style.css" />
+		<script src="app.js" defer></script>
+	</head>
+	<body>
+		<header class="bar">
+			<div class="brand">
+				<img src="amul-logo.svg" alt="" width="36" height="36" />
+				<span>Amul AI Platform</span>
+			</div>
+			<div class="who" id="who" hidden>
+				<span class="who-name" id="who-name"></span>
+				<a class="sign-out" href="/oauth2/sign_out?rd=%2F">Sign out</a>
+			</div>
+		</header>
+		<main>
+			<h1>Your tools</h1>
+			<p class="status" id="status">Loading...</p>
+			<ul class="tiles" id="tiles"></ul>
+		</main>
+	</body>
+</html>

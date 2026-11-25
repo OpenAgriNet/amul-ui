@@ -1,0 +1,16 @@
+[
+	{
+		"id": "lenspack",
+		"name": "lenspack",
+		"description": "Dashboards over telemetry: build, share and ask questions of boards.",
+		"url": "https://lenspack.prod.amulai.in/",
+		"role": "lenspack:access"
+	},
+	{
+		"id": "grafana",
+		"name": "Grafana",
+		"description": "Service health, metrics and alerts.",
+		"url": "https://grafana.prod.amulai.in/login/generic_oauth",
+		"role": "grafana:*"
+	}
+]
