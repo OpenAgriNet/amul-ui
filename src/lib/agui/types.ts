@@ -25,6 +25,19 @@ export type UIAction =
 			revision: number;
 			kind: "confirm";
 			value: { confirmed: boolean };
+	  }
+	| {
+			component_id: string;
+			revision: number;
+			kind: "listing_filters";
+			/** The complete filter state; null clears a filter. */
+			value: { source: ListingSource; filters: ListingFilters };
+	  }
+	| {
+			component_id: string;
+			revision: number;
+			kind: "open_listing";
+			value: { listing_ref: string };
 	  };
 
 export type ChatCommand =
@@ -138,6 +151,72 @@ export type ConfirmComponent = ComponentBase & {
 	outcome: BookingOutcome | null;
 };
 
+/** #639 / backend #641: cattle and fodder listings. */
+export type ListingSource = "cattle" | "fodder";
+
+export type ListingFilterValue = string | number | null;
+export type ListingFilters = Record<string, ListingFilterValue>;
+
+/**
+ * A source fact under a stable key ("asking_price_inr", "price.rate_inr",
+ * "location.district.name_en"). Labels are ours; values are shown as sent.
+ */
+export type ListingFact = { key: string; value: string | number | boolean };
+
+export type ListingCard = {
+	/** Opaque; sent back to open the listing. */
+	listing_ref: string;
+	listing_number: number | null;
+	title: string;
+	facts: ListingFact[];
+};
+
+export type ListingFilterDefinition = {
+	name: string;
+	kind: "text" | "number" | "select";
+	/** Select values, or suggestions for a text filter. */
+	options: string[];
+	minimum: number | null;
+	maximum: number | null;
+	unit: string | null;
+};
+
+/** Reused: filtering bumps its revision and replaces the cards. */
+export type ListingCollectionComponent = ComponentBase & {
+	kind: "listing_collection";
+	purpose: ListingSource;
+	filters: ListingFilters;
+	filter_definitions: ListingFilterDefinition[];
+	cards: ListingCard[];
+	displayed_count: number;
+	/** Cattle: matches before the card cap. Fodder: unknown (null). */
+	match_count: number | null;
+	/** Cattle: everything listed. Fodder: the provider's search total. */
+	source_total: number | null;
+	/** Cattle matches outside the searched district. */
+	elsewhere_count: number | null;
+	source_status: string;
+	notice: string | null;
+	/** Unix seconds. */
+	fetched_at: number | null;
+	stale: boolean;
+};
+
+export type ListingDetailComponent = ComponentBase & {
+	kind: "listing_detail";
+	purpose: ListingSource;
+	collection_id: string;
+	listing_ref: string;
+	title: string;
+	facts: ListingFact[];
+	seller: { name?: string | null; mobile?: string | null } | null;
+	/** "ok", "not_found" or "unavailable". */
+	source_status: string;
+	notice: string | null;
+	fetched_at: number | null;
+	stale: boolean;
+};
+
 export type MilkResult = {
 	status: "ok" | "no_records";
 	account: { option_id: string; label: string };
@@ -176,7 +255,13 @@ export type ChartComponent = ComponentBase & {
 	data: MilkResult;
 };
 
-export type UIComponent = ChoiceComponent | DateRangeComponent | ConfirmComponent | ChartComponent;
+export type UIComponent =
+	| ChoiceComponent
+	| DateRangeComponent
+	| ConfirmComponent
+	| ChartComponent
+	| ListingCollectionComponent
+	| ListingDetailComponent;
 
 export type AmulUIState = {
 	version: 1;

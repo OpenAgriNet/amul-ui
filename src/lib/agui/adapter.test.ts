@@ -318,6 +318,99 @@ describe("mandi and scheme pickers against the fake backend (#639, backend #640)
 	});
 });
 
+describe("cattle and fodder cards against the fake backend (#639, backend #641)", () => {
+	const collectionOf = (ui: AmulUIState) => {
+		const c = ui.components.find((x) => x.kind === "listing_collection" && x.status !== "expired");
+		if (c?.kind !== "listing_collection") throw new Error("expected a listing collection");
+		return c;
+	};
+	const detailOf = (ui: AmulUIState) => ui.components.find((x) => x.kind === "listing_detail");
+
+	it("shows capped cattle cards with distinct counts and every filter", async () => {
+		const server = createMockChatServer({ chunkDelayMs: 0, fragments: 3 });
+		const ui = latestUi((await turn(server.fetch, { kind: "message", text: "I want to buy cow" })).events);
+		const c = collectionOf(ui);
+		expect(c).toMatchObject({ purpose: "cattle", status: "pending", displayed_count: 4, match_count: 6, source_total: 120 });
+		expect(c.cards).toHaveLength(4);
+		expect(c.filter_definitions.map((d) => d.name)).toContain("pregnancy_status");
+	});
+
+	it("filters replace the cards on the same control with a new revision", async () => {
+		const server = createMockChatServer({ chunkDelayMs: 0 });
+		let ui = latestUi((await turn(server.fetch, { kind: "message", text: "cattle" })).events);
+		const before = collectionOf(ui);
+		const filters = { ...before.filters, district: "Banaskantha", village: "Deesa" };
+		ui = latestUi(
+			(await turn(server.fetch, {
+				kind: "ui_action",
+				action: { component_id: before.id, revision: before.revision, kind: "listing_filters", value: { source: "cattle", filters } }
+			})).events,
+			ui
+		);
+		const after = collectionOf(ui);
+		expect(after.id).toBe(before.id);
+		expect(after.revision).toBe(before.revision + 1);
+		expect(after.cards.map((card) => card.listing_number)).toEqual([1201]);
+		// The old revision can no longer act.
+		await expect(
+			turn(server.fetch, {
+				kind: "ui_action",
+				action: { component_id: before.id, revision: before.revision, kind: "listing_filters", value: { source: "cattle", filters } }
+			})
+		).rejects.toMatchObject({ status: 409, code: "STALE_COMPONENT" });
+	});
+
+	it("View details opens one detail card; the collection stays usable; filtering expires it", async () => {
+		const server = createMockChatServer({ chunkDelayMs: 0 });
+		let ui = latestUi((await turn(server.fetch, { kind: "message", text: "fodder" })).events);
+		const c = collectionOf(ui);
+		const open = (ref: string) =>
+			turn(server.fetch, { kind: "ui_action", action: { component_id: c.id, revision: c.revision, kind: "open_listing", value: { listing_ref: ref } } });
+
+		ui = latestUi((await open(c.cards[0]!.listing_ref)).events, ui);
+		expect(detailOf(ui)).toMatchObject({ status: "submitted", source_status: "ok", seller: { mobile: "9000000201" } });
+		expect(collectionOf(ui).revision).toBe(c.revision);
+
+		// Wheat straw: the seller has not shared contact.
+		ui = latestUi((await open(c.cards[1]!.listing_ref)).events, ui);
+		expect(ui.components.filter((x) => x.kind === "listing_detail")).toHaveLength(1);
+		expect(detailOf(ui)).toMatchObject({ listing_ref: c.cards[1]!.listing_ref, seller: null });
+
+		await expect(open("made_up_ref")).rejects.toMatchObject({ status: 422, code: "INVALID_LISTING" });
+
+		ui = latestUi(
+			(await turn(server.fetch, {
+				kind: "ui_action",
+				action: { component_id: c.id, revision: c.revision, kind: "listing_filters", value: { source: "fodder", filters: { ...c.filters, form: "SILAGE" } } }
+			})).events,
+			ui
+		);
+		expect(detailOf(ui)?.status).toBe("expired");
+	});
+
+	it("a sold listing returns not_found without another seller's details", async () => {
+		const server = createMockChatServer({ chunkDelayMs: 0 });
+		let ui = latestUi((await turn(server.fetch, { kind: "message", text: "cattle" })).events);
+		let c = collectionOf(ui);
+		ui = latestUi(
+			(await turn(server.fetch, {
+				kind: "ui_action",
+				action: { component_id: c.id, revision: c.revision, kind: "listing_filters", value: { source: "cattle", filters: { ...c.filters, district: "Anand" } } }
+			})).events,
+			ui
+		);
+		c = collectionOf(ui);
+		ui = latestUi(
+			(await turn(server.fetch, {
+				kind: "ui_action",
+				action: { component_id: c.id, revision: c.revision, kind: "open_listing", value: { listing_ref: c.cards[0]!.listing_ref } }
+			})).events,
+			ui
+		);
+		expect(detailOf(ui)).toMatchObject({ source_status: "not_found", facts: [], seller: null });
+	});
+});
+
 describe("runChatTurn with a text-v1 response", () => {
 	it("passes raw text chunks through, including Gujarati split mid-character", async () => {
 		const bytes = new TextEncoder().encode("નમસ્તે ખેડૂત");

@@ -11,7 +11,12 @@ export function useLabel() {
 		const value = t(`agui.${key}`, params);
 		return Array.isArray(value) ? value.join(" ") : value;
 	};
-	return { label, language };
+	/** The label, or `fallback` when no language defines the key. */
+	const labelOr = (key: string, fallback: string) => {
+		const value = label(key);
+		return value === `agui.${key}` ? fallback : value;
+	};
+	return { label, labelOr, language };
 }
 
 /** Indian grouping and Latin digits, whatever the chat language. */

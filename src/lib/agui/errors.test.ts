@@ -35,7 +35,11 @@ const BACKEND_CODES = [
 	"MANDI_LOCATION_UNSUPPORTED",
 	"MANDI_UNAVAILABLE",
 	"SCHEMES_UNAVAILABLE",
-	"SCHEME_ACCESS_CHANGED"
+	"SCHEME_ACCESS_CHANGED",
+	// Cattle and fodder listings, OpenAgriNet/amul-oan-api#641.
+	"LISTINGS_UNAVAILABLE",
+	"INVALID_LISTING",
+	"INVALID_FILTERS"
 ];
 
 describe("aguiErrorText", () => {
