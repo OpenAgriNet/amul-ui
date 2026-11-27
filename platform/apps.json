@@ -22,5 +22,13 @@
 		"url": "https://langfuse.prod.amulai.in",
 		"thumbnail": "thumbs/langfuse.webp",
 		"access": { "client": "langfuse", "roles": ["access"] }
+	},
+	{
+		"id": "docs",
+		"name": "Docs",
+		"description": "What Sarlaben can do, how each flow works and the service map behind it.",
+		"url": "https://docs.amulai.in",
+		"thumbnail": "thumbs/docs.webp",
+		"access": "any"
 	}
 ]
