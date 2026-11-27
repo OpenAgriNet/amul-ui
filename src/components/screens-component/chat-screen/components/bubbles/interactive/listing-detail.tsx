@@ -43,7 +43,7 @@ export function ListingDetail({ component }: { readonly component: ListingDetail
 			<p className="text-xs font-medium text-muted-foreground">{label("listing.details")}</p>
 			<div className="flex items-start justify-between gap-2">
 				<h4 className="min-w-0 wrap-break-word text-sm font-semibold capitalize text-foreground">
-					{listingTitle(component.purpose, component.title, facts, language)}
+					{listingTitle(component.purpose, component.title, facts, labels)}
 				</h4>
 				{listingNumber !== undefined ? <span className="shrink-0 text-xs text-muted-foreground tabular-nums">#{String(listingNumber)}</span> : null}
 			</div>

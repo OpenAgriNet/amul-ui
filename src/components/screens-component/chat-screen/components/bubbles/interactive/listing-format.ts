@@ -79,10 +79,20 @@ export function headlinePrice(source: ListingSource, facts: Map<string, FactValu
 	return source === "cattle" ? rupees(facts.get("asking_price_inr")) : fodderPrice(facts, language);
 }
 
-/** The card title in Gujarati for fodder when the source has it. */
-export function listingTitle(source: ListingSource, title: string, facts: Map<string, FactValue>, language: string): string {
-	if (source !== "fodder" || language !== "gu") return title;
-	return localName(facts, "material", language, "canonical_name_en") ?? title;
+/**
+ * The card title. Cattle: breed and our translated species ("Gir Cow", "Gir ગાય"),
+ * since the source title is English and says "breed not given". Fodder: the
+ * Gujarati name when the chat is in Gujarati and the source has it.
+ */
+export function listingTitle(source: ListingSource, title: string, facts: Map<string, FactValue>, labels: Labels): string {
+	if (source === "cattle") {
+		const species = facts.get("species");
+		if (species === undefined) return title;
+		const breed = facts.get("breed");
+		return [breed === undefined ? null : String(breed), enumLabel(labels, String(species))].filter(Boolean).join(" ");
+	}
+	if (labels.language !== "gu") return title;
+	return localName(facts, "material", labels.language, "canonical_name_en") ?? title;
 }
 
 /** The few rows a summary card shows under its price. */

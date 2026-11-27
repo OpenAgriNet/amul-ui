@@ -31,6 +31,18 @@ describe("listing facts", () => {
 		expect(isMissing(0)).toBe(false);
 	});
 
+	it("drops the cattle source's 'not given' placeholders and a 0 milk yield", () => {
+		const facts = factMap([
+			{ key: "breed", value: "breed not given" },
+			{ key: "age", value: "age not given" },
+			{ key: "milk_per_day_litres", value: "0" },
+			{ key: "asking_price_inr", value: "0" },
+			{ key: "species", value: "buffalo" }
+		]);
+		// A price of 0 is a value, not a placeholder.
+		expect([...facts.keys()]).toEqual(["asking_price_inr", "species"]);
+	});
+
 	it("reads numbers from numbers and numeric strings only", () => {
 		expect(toNumber("8.5")).toBe(8.5);
 		expect(toNumber(12)).toBe(12);

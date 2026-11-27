@@ -14,10 +14,22 @@ export function isMissing(value: unknown): boolean {
 	return typeof value === "string" && MISSING.has(value.trim().toLowerCase());
 }
 
+/** Placeholders the cattle source writes in place of a value ("breed not given", "age not given"). */
+const NOT_GIVEN = /\bnot given\b/i;
+
+/**
+ * Facts that only say "unknown". The cattle source reports an unknown milk
+ * yield as 0, which its own text formatter also leaves out.
+ */
+function saysUnknown(key: string, value: FactValue): boolean {
+	if (typeof value === "string" && NOT_GIVEN.test(value)) return true;
+	return key === "milk_per_day_litres" && toNumber(value) === 0;
+}
+
 /** The facts by key, without the missing ones. */
 export function factMap(facts: readonly ListingFact[]): Map<string, FactValue> {
 	const map = new Map<string, FactValue>();
-	for (const fact of facts) if (!isMissing(fact.value)) map.set(fact.key, fact.value);
+	for (const fact of facts) if (!isMissing(fact.value) && !saysUnknown(fact.key, fact.value)) map.set(fact.key, fact.value);
 	return map;
 }
 

@@ -299,7 +299,7 @@ function SummaryCard({
 		<article className={cn("rounded-xl border bg-background p-3", isOpen ? "border-primary" : "border-primary/20")}>
 			<div className="flex items-start justify-between gap-2">
 				<h4 className="min-w-0 wrap-break-word text-sm font-semibold capitalize text-foreground">
-					{listingTitle(component.purpose, card.title, facts, language)}
+					{listingTitle(component.purpose, card.title, facts, labels)}
 				</h4>
 				{card.listing_number !== null ? (
 					<span className="shrink-0 text-xs text-muted-foreground tabular-nums">#{card.listing_number}</span>
