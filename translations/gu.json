@@ -138,6 +138,11 @@
     "bookingSent": "મોકલ્યું",
     "bookingCancelled": "રદ થયું",
     "ticket": "ટિકિટ",
+    "district": "જિલ્લો",
+    "scheme": "યોજના",
+    "search": "શોધો",
+    "clearSearch": "શોધ સાફ કરો",
+    "noMatches": "કંઈ મળ્યું નહીં. બીજી જોડણી અજમાવો.",
     "outcome": {
       "confirmed": "બુકિંગ થઈ ગયું",
       "rejected": "બુકિંગ સ્વીકારાયું નથી",
@@ -169,7 +174,11 @@
       "AI_BOOKING_REJECTED": "બુકિંગ સ્વીકારાયું નથી.",
       "AI_BOOKING_NOT_SENT": "બુકિંગ મોકલાયું નથી.",
       "AI_BOOKING_UNCONFIRMED": "બુકિંગ કન્ફર્મ થઈ શક્યું નથી. કૃપા કરીને તરત ફરી બુકિંગ ન કરો.",
-      "AI_BOOKING_ALREADY_REQUESTED": "બુકિંગની વિનંતી પહેલેથી થઈ ગઈ છે."
+      "AI_BOOKING_ALREADY_REQUESTED": "બુકિંગની વિનંતી પહેલેથી થઈ ગઈ છે.",
+      "MANDI_LOCATION_UNSUPPORTED": "આ સ્થળ મંડી શોધ વિસ્તારની બહાર છે. કૃપા કરીને ગુજરાતનો જિલ્લો પસંદ કરો.",
+      "MANDI_UNAVAILABLE": "હાલમાં મંડીના ભાવ ઉપલબ્ધ નથી. થોડી વારમાં ફરી પ્રયાસ કરો.",
+      "SCHEMES_UNAVAILABLE": "હાલમાં યોજનાની માહિતી ઉપલબ્ધ નથી. થોડી વારમાં ફરી પ્રયાસ કરો.",
+      "SCHEME_ACCESS_CHANGED": "આ યોજના હવે તમારા ખાતા માટે ઉપલબ્ધ નથી. કૃપા કરીને ફરી પૂછો."
     }
   }
 }

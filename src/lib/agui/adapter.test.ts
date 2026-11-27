@@ -282,6 +282,42 @@ describe("AI booking flow against the fake backend (#636, backend #637)", () => 
 	});
 });
 
+describe("mandi and scheme pickers against the fake backend (#639, backend #640)", () => {
+	it("a mandi question without a place gets a searchable district picker; the pick goes by id", async () => {
+		const server = createMockChatServer({ chunkDelayMs: 0, fragments: 5 });
+		let ui = latestUi((await turn(server.fetch, { kind: "message", text: "onion mandi price" })).events);
+		const picker = ui.components[0];
+		if (picker?.kind !== "choice") throw new Error("expected a choice");
+		expect(picker).toMatchObject({ purpose: "mandi_location", searchable: true, status: "pending" });
+		expect(picker.options.find((o) => o.id === "dist_banas")?.search_terms).toContain("palanpur");
+
+		const { events } = await turn(server.fetch, {
+			kind: "ui_action",
+			action: { component_id: picker.id, revision: picker.revision, kind: "choice", value: { option_id: "dist_rajkot" } }
+		});
+		ui = latestUi(events, ui);
+		expect(ui.components[0]).toMatchObject({ status: "submitted", selected: { option_id: "dist_rajkot" } });
+		expect(events.at(-1)?.type).toBe("RUN_FINISHED");
+	});
+
+	it("scheme options name their source and leave other pending controls alone", async () => {
+		const server = createMockChatServer({ chunkDelayMs: 0 });
+		let ui = latestUi((await turn(server.fetch, { kind: "message", text: "show my milk" })).events);
+		ui = latestUi((await turn(server.fetch, { kind: "message", text: "which scheme can I get?" })).events, ui);
+		const [account, scheme] = ui.components;
+		expect(account).toMatchObject({ purpose: "milk_account", status: "pending" });
+		if (scheme?.kind !== "choice") throw new Error("expected a choice");
+		expect(scheme.purpose).toBe("scheme");
+		expect(new Set(scheme.options.map((o) => o.description))).toEqual(new Set(["Banas dairy union", "Central government"]));
+	});
+
+	it("an unsupported place ends with MANDI_LOCATION_UNSUPPORTED", async () => {
+		const server = createMockChatServer({ chunkDelayMs: 0 });
+		const { events } = await turn(server.fetch, { kind: "message", text: "onion mandi price in Mumbai" });
+		expect(events.find((e) => e.type === "RUN_ERROR")).toMatchObject({ code: "MANDI_LOCATION_UNSUPPORTED" });
+	});
+});
+
 describe("runChatTurn with a text-v1 response", () => {
 	it("passes raw text chunks through, including Gujarati split mid-character", async () => {
 		const bytes = new TextEncoder().encode("નમસ્તે ખેડૂત");

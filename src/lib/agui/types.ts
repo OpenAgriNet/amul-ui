@@ -79,14 +79,18 @@ export type ChoiceOption = {
 	id: string;
 	label: string;
 	description: string | null;
+	/** #639: extra words the picker search matches (aliases, codes). */
+	search_terms?: string[];
 };
 
-/** milk_account is #593; ai_technician and ai_species are #636. */
-export type ChoicePurpose = "milk_account" | "ai_technician" | "ai_species";
+/** milk_account is #593; ai_technician and ai_species are #636; mandi_location and scheme are #639. */
+export type ChoicePurpose = "milk_account" | "ai_technician" | "ai_species" | "mandi_location" | "scheme";
 
 export type ChoiceComponent = ComponentBase & {
 	kind: "choice";
 	purpose: ChoicePurpose;
+	/** #639: show a search box; filtering happens here, the pick is still sent by id. */
+	searchable?: boolean;
 	options: ChoiceOption[];
 	selected: { option_id: string } | null;
 };

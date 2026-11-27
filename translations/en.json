@@ -481,6 +481,11 @@
     "bookingSent": "Sent",
     "bookingCancelled": "Cancelled",
     "ticket": "Ticket",
+    "district": "District",
+    "scheme": "Scheme",
+    "search": "Search",
+    "clearSearch": "Clear search",
+    "noMatches": "No matches. Try another spelling.",
     "outcome": {
       "confirmed": "Booking done",
       "rejected": "Booking not accepted",
@@ -512,7 +517,11 @@
       "AI_BOOKING_REJECTED": "The booking was not accepted.",
       "AI_BOOKING_NOT_SENT": "The booking was not sent.",
       "AI_BOOKING_UNCONFIRMED": "The booking could not be confirmed. Please don't book again right away.",
-      "AI_BOOKING_ALREADY_REQUESTED": "A booking has already been requested."
+      "AI_BOOKING_ALREADY_REQUESTED": "A booking has already been requested.",
+      "MANDI_LOCATION_UNSUPPORTED": "That place is outside the mandi search areas. Please choose a Gujarat district.",
+      "MANDI_UNAVAILABLE": "Mandi prices are not available right now. Please try again shortly.",
+      "SCHEMES_UNAVAILABLE": "Scheme details are not available right now. Please try again shortly.",
+      "SCHEME_ACCESS_CHANGED": "This scheme is no longer available for your account. Please ask again."
     }
   }
 }

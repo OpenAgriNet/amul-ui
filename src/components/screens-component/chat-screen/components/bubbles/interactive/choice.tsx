@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { Check, Loader2, X } from "lucide-react";
+import { useId, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { Check, Loader2, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/hooks/store/chat";
-import type { ChoiceComponent, ChoicePurpose } from "@/lib/agui/types";
+import { filterChoiceOptions } from "@/lib/agui/choice-search";
+import type { ChoiceComponent, ChoiceOption, ChoicePurpose } from "@/lib/agui/types";
 import { cn } from "@/lib/utils";
 import { AnsweredRow, ControlCard, useLabel } from "./shared";
 
@@ -10,13 +11,16 @@ import { AnsweredRow, ControlCard, useLabel } from "./shared";
 const ANSWER_LABEL: Record<ChoicePurpose, string> = {
 	milk_account: "account",
 	ai_technician: "technician",
-	ai_species: "animal"
+	ai_species: "animal",
+	mandi_location: "district",
+	scheme: "scheme"
 };
 
 /**
  * A single-choice picker: milk account (#593), AI technician or Cow/Buffalo
- * (#636). Only the option id is sent back; the backend maps it. Booking
- * pickers also offer Cancel, which ends the booking at this stage.
+ * (#636), mandi district or scheme (#639). Only the option id is sent back;
+ * the backend maps it. Booking pickers also offer Cancel, which ends the
+ * booking at this stage. Searchable pickers filter their options here.
  */
 export function ChoiceControl({ component }: { readonly component: ChoiceComponent }) {
 	const { label, language } = useLabel();
@@ -26,6 +30,11 @@ export function ChoiceControl({ component }: { readonly component: ChoiceCompone
 	const busy = useChatStore((s) => s.isAssistantTyping);
 	const [picked, setPicked] = useState<string | null>(null);
 	const [cancelling, setCancelling] = useState(false);
+	const [query, setQuery] = useState("");
+	const visible = useMemo(
+		() => (component.searchable ? filterChoiceOptions(component.options, query) : component.options),
+		[component.options, component.searchable, query]
+	);
 
 	if (component.status !== "pending") {
 		const chosen = component.options.find((o) => o.id === component.selected?.option_id);
@@ -49,11 +58,25 @@ export function ChoiceControl({ component }: { readonly component: ChoiceCompone
 		);
 	};
 
+	// A picked option stays on screen while the search hides the others.
+	const pickedOption = picked ? component.options.find((o) => o.id === picked) : undefined;
+	const shown: ChoiceOption[] = pickedOption && !visible.includes(pickedOption) ? [pickedOption, ...visible] : visible;
+
 	return (
 		<ControlCard>
 			<p className="mb-2 text-sm font-semibold text-foreground">{component.title}</p>
-			<div role="radiogroup" aria-label={component.title} className="flex flex-col gap-2">
-				{component.options.map((option) => {
+			{component.searchable ? <ChoiceSearch value={query} onChange={setQuery} disabled={busy} /> : null}
+			<div
+				role="radiogroup"
+				aria-label={component.title}
+				className={cn("flex flex-col gap-2", component.searchable && "max-h-72 overflow-y-auto overscroll-contain p-0.5")}
+			>
+				{visible.length === 0 ? (
+					<p role="status" className="px-1 py-3 text-center text-sm text-muted-foreground">
+						{label("noMatches")}
+					</p>
+				) : null}
+				{shown.map((option) => {
 					const selected = picked === option.id;
 					return (
 						<button
@@ -79,9 +102,9 @@ export function ChoiceControl({ component }: { readonly component: ChoiceCompone
 								{selected ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
 							</span>
 							<span className="min-w-0">
-								<span className="block text-sm font-semibold text-foreground">{option.label}</span>
+								<span className="block text-sm font-semibold text-foreground wrap-break-word">{option.label}</span>
 								{option.description ? (
-									<span className="block text-xs text-muted-foreground">{option.description}</span>
+									<span className="block text-xs text-muted-foreground wrap-break-word">{option.description}</span>
 								) : null}
 							</span>
 						</button>
@@ -117,5 +140,52 @@ export function ChoiceControl({ component }: { readonly component: ChoiceCompone
 				</Button>
 			) : null}
 		</ControlCard>
+	);
+}
+
+/** The search box over a searchable picker. Not focused on its own, so a phone keyboard does not pop up. */
+function ChoiceSearch({
+	value,
+	onChange,
+	disabled
+}: {
+	readonly value: string;
+	readonly onChange: Dispatch<SetStateAction<string>>;
+	readonly disabled: boolean;
+}) {
+	const { label } = useLabel();
+	const id = useId();
+	return (
+		<div className="relative mb-2">
+			<label htmlFor={id} className="sr-only">
+				{label("search")}
+			</label>
+			<Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+			<input
+				id={id}
+				type="search"
+				value={value}
+				disabled={disabled}
+				onChange={(e) => onChange(e.target.value)}
+				placeholder={label("search")}
+				autoComplete="off"
+				enterKeyHint="search"
+				className={cn(
+					"h-10 w-full rounded-xl border border-primary/20 bg-background pl-9 pr-9 text-sm text-foreground",
+					"placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40",
+					"disabled:cursor-not-allowed disabled:opacity-60 [&::-webkit-search-cancel-button]:hidden"
+				)}
+			/>
+			{value ? (
+				<button
+					type="button"
+					onClick={() => onChange("")}
+					aria-label={label("clearSearch")}
+					className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:bg-muted"
+				>
+					<X className="h-4 w-4" aria-hidden="true" />
+				</button>
+			) : null}
+		</div>
 	);
 }

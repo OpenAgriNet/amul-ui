@@ -1,5 +1,5 @@
 // Test-only fake of the backend's POST /api/chat/ (OpenAgriNet/amul-oan-api#593,
-// plus the AI booking flow proposed on #636).
+// plus the AI booking flow of #636/#637 and the mandi/scheme pickers of #639/#640).
 // It follows the contract: one operation per request, AG-UI events over SSE,
 // full STATE_SNAPSHOTs, and 409/422 errors before the stream starts. Only the
 // adapter tests import it; the app never does.
@@ -45,6 +45,32 @@ const TECHNICIANS = [
 const BOOKING_ACCOUNT = "Anand Milk Society · 1042";
 
 const BOOKING_WORDS = ["insemination", "technician", "બીજદાન", "ગર્ભાધાન", "गर्भाधान", "रेतन"];
+
+// #640: a mandi question with no known place gets a searchable district picker.
+// Ids are opaque, like the backend's; search terms carry the aliases.
+const DISTRICTS = [
+	{ id: "dist_ahd", label: "Ahmedabad", description: null, search_terms: ["ahmedabad", "amdavad", "અમદાવાદ"] },
+	{ id: "dist_anand", label: "Anand", description: null, search_terms: ["anand", "આણંદ"] },
+	{ id: "dist_banas", label: "Banaskantha", description: null, search_terms: ["banaskantha", "palanpur", "બનાસકાંઠા"] },
+	{ id: "dist_kheda", label: "Kheda", description: null, search_terms: ["kheda", "nadiad", "ખેડા"] },
+	{ id: "dist_mehsana", label: "Mehsana", description: null, search_terms: ["mehsana", "મહેસાણા"] },
+	{ id: "dist_rajkot", label: "Rajkot", description: null, search_terms: ["rajkot", "રાજકોટ"] },
+	{ id: "dist_surat", label: "Surat", description: null, search_terms: ["surat", "સુરત"] },
+	{ id: "dist_vadodara", label: "Vadodara", description: null, search_terms: ["vadodara", "baroda", "વડોદરા"] }
+];
+
+// Descriptions name the source, as the backend does. The schemes are made up.
+const SCHEMES = [
+	{ id: "sch_u1", label: "Cattle shed subsidy", description: "Banas dairy union", search_terms: [] },
+	{ id: "sch_u2", label: "Fodder seed support", description: "Banas dairy union", search_terms: [] },
+	{ id: "sch_c1", label: "PM-KISAN", description: "Central government", search_terms: ["pm kisan", "kisan samman nidhi"] },
+	{ id: "sch_c2", label: "Kisan Credit Card", description: "Central government", search_terms: ["kcc"] }
+];
+
+const MANDI_WORDS = ["mandi", "મંડી", "मंडी", "ભાવ", "भाव"];
+const SCHEME_WORDS = ["scheme", "યોજના", "योजना"];
+/** A place the fake treats as outside the mandi search areas. */
+const UNSUPPORTED_PLACE = "mumbai";
 
 type Event = Record<string, unknown> & { type: string };
 
@@ -137,6 +163,8 @@ export function createMockChatServer(options: MockOptions = {}) {
 	let ui: AmulUIState = { version: 1, state_revision: 0, selected_milk_account: null, components: [] };
 	/** Booking choices so far, by workflow. */
 	const bookings = new Map<string, { species?: string; technician?: string }>();
+	/** #640 picker workflows, by workflow id. */
+	const selectors = new Map<string, "mandi_location" | "scheme">();
 	let bookingsMade = 0;
 
 	const publish = (components: UIComponent[], selected = ui.selected_milk_account) => {
@@ -344,6 +372,43 @@ export function createMockChatServer(options: MockOptions = {}) {
 		return jsonError(422, "UNSUPPORTED_ACTION", "This control does not accept that action.", target.id);
 	}
 
+	function startSelectorWorkflow(body: AguiRequestBody, purpose: "mandi_location" | "scheme"): Response {
+		const messageId = nextId("msg");
+		const workflowId = nextId("wf");
+		selectors.set(workflowId, purpose);
+		const title = purpose === "mandi_location" ? "Choose the search district" : "Choose a scheme";
+		const picker: ChoiceComponent = {
+			...base(messageId, workflowId, title),
+			kind: "choice",
+			purpose,
+			searchable: true,
+			options: (purpose === "mandi_location" ? DISTRICTS : SCHEMES).map((o) => ({ ...o, search_terms: [...o.search_terms] })),
+			selected: null
+		};
+		// Other pending controls stay usable, as in #640.
+		publish([...ui.components, picker]);
+		return stream(body, [...textEvents(messageId, title), snapshot()]);
+	}
+
+	function handleSelectorAction(
+		body: AguiRequestBody,
+		target: UIComponent,
+		action: NonNullable<AguiRequestBody["forwardedProps"]["ui_action"]>
+	): Response {
+		if (target.kind !== "choice" || action.kind !== "choice") {
+			return jsonError(422, "UNSUPPORTED_ACTION", "This control does not accept that action.", target.id);
+		}
+		const option = target.options.find((o) => o.id === action.value.option_id);
+		if (!option) return jsonError(422, "INVALID_OPTION", "Choose one of the displayed options.", target.id);
+		const messageId = nextId("msg");
+		publish(ui.components.map((c) => (c.id === target.id ? markSubmitted(c, { option_id: option.id }) : c)));
+		const text =
+			target.purpose === "mandi_location"
+				? `Mandi prices for onion near ${option.label}: ₹1,200–₹1,650 per quintal.`
+				: `${option.label} (${option.description}): details from the source.`;
+		return stream(body, [...textEvents(messageId, text), snapshot()]);
+	}
+
 	function startMilkWorkflow(body: AguiRequestBody, intro: string): Response {
 		const messageId = nextId("msg");
 		const workflowId = nextId("wf");
@@ -364,6 +429,18 @@ export function createMockChatServer(options: MockOptions = {}) {
 			}
 			if (MILK_WORDS.some((w) => text.toLowerCase().includes(w))) {
 				return startMilkWorkflow(body, "Sure.");
+			}
+			if (MANDI_WORDS.some((w) => text.toLowerCase().includes(w))) {
+				if (text.toLowerCase().includes(UNSUPPORTED_PLACE)) {
+					const message = "That place is outside the supported mandi search areas. Please choose a supported Gujarat district.";
+					return stream(body, textEvents(nextId("msg"), message), {
+						error: { code: "MANDI_LOCATION_UNSUPPORTED", message, retryable: false }
+					});
+				}
+				return startSelectorWorkflow(body, "mandi_location");
+			}
+			if (SCHEME_WORDS.some((w) => text.toLowerCase().includes(w))) {
+				return startSelectorWorkflow(body, "scheme");
 			}
 			const messageId = nextId("msg");
 			return stream(body, textEvents(messageId, "This is mock mode. Ask about your milk records to try the new controls."));
@@ -410,6 +487,7 @@ export function createMockChatServer(options: MockOptions = {}) {
 		}
 
 		if (bookings.has(target.workflow_id)) return handleBookingAction(body, target, action);
+		if (selectors.has(target.workflow_id)) return handleSelectorAction(body, target, action);
 
 		if (action.kind === "choice" && target.kind === "choice") {
 			const option = ACCOUNTS.find((a) => a.id === action.value.option_id);
@@ -460,6 +538,7 @@ export function createMockChatServer(options: MockOptions = {}) {
 		reset: () => {
 			ui = { version: 1, state_revision: 0, selected_milk_account: null, components: [] };
 			bookings.clear();
+			selectors.clear();
 			bookingsMade = 0;
 		},
 		/** How many bookings were actually made, to check a repeat confirm adds none. */
