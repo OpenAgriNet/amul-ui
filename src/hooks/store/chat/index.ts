@@ -12,6 +12,23 @@ import { useAuthStore } from "@/hooks/store/auth";
 import type { ToastType } from "@/components/screens-component/chat-screen/components/toast";
 import { parseChatWire, type ChatArtifact } from "@/lib/chat-artifacts";
 import type { FAQCategoryId } from "@/components/screens-component/chat-screen/config";
+import type { BaseEvent } from "@ag-ui/core";
+import { ChatRequestError, runChatTurn } from "@/lib/agui/adapter";
+import { aguiApiUrl, shouldUseAguiTransport } from "@/lib/agui/transport";
+import { applySnapshot, emptyUiState, readAmulUiSnapshot } from "@/lib/agui/state";
+import { aguiErrorText, GENERIC_CHAT_ERROR } from "@/lib/agui/errors";
+import {
+	AGUI_CUSTOM_ARTIFACTS,
+	AGUI_CUSTOM_UI_ERROR,
+	type AmulUIState,
+	type ArtifactsEventValue,
+	type BookingField,
+	type ChatCommand,
+	type ChatError,
+	type ChatFormat,
+	type ChatOperation,
+	type UIAction
+} from "@/lib/agui/types";
 
 import enData from "../../../../translations/en.json";
 import guData from "../../../../translations/gu.json";
@@ -63,6 +80,15 @@ type ChatStore = {
 	isFetchingSuggestions: boolean;
 	sessionId: string | null;
 	persona: ChatPersona;
+	// #593: interactive controls the backend sent, and the one being submitted.
+	amulUi: AmulUIState;
+	submittingComponentId: string | null;
+	submitUiAction: (action: UIAction, language: string) => Promise<void>;
+	changeMilkAccount: (language: string) => Promise<void>;
+	/** #636 Change technician / Change animal; `componentId` is the control whose button was pressed. */
+	editAiBooking: (componentId: string, workflowId: string, field: BookingField, language: string) => Promise<void>;
+	/** #636 Cancel at any pending booking stage. */
+	cancelAiBooking: (componentId: string, workflowId: string, language: string) => Promise<void>;
 	setPersona: (persona: ChatPersona) => void;
 	initializeSession: (user: any) => void;
 	sendText: (text: string, language: string) => Promise<void>;
@@ -291,22 +317,159 @@ import { ANONYMOUS_BOOTSTRAP_SESSION_KEY } from "@/lib/anonymous-bootstrap";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// scope "agui-v1": the reply came over AG-UI, whose suggestions the backend keeps per signed-in farmer.
 async function fetchSuggestionsWithRetry(
 	sessionId: string,
 	language: string,
 	isStale?: () => boolean,
+	scope?: "agui-v1",
 ) {
 	const retryDelaysMs = [300, 700, 1200, 2000];
 	for (let attempt = 0; attempt < retryDelaysMs.length; attempt++) {
 		if (isStale?.()) return [];
-		const suggestions = await apiService.getSuggestions(sessionId, language);
+		const suggestions = await apiService.getSuggestions(sessionId, language, scope);
 		if (suggestions.length > 0) {
 			return suggestions;
 		}
 		await wait(retryDelaysMs[attempt] ?? 0);
 	}
 	if (isStale?.()) return [];
-	return await apiService.getSuggestions(sessionId, language);
+	return await apiService.getSuggestions(sessionId, language, scope);
+}
+
+type AguiTurnContext = {
+	language: string;
+	sessionId: string;
+	persona: ChatPersona;
+	questionId?: string;
+	questionText?: string;
+	isStale: () => boolean;
+};
+
+/* eslint-disable no-unused-vars */
+type AguiTextFallback = {
+	onTextChunk?: (chunk: string) => void;
+	onTraceId?: (traceId: string) => void;
+};
+/* eslint-enable no-unused-vars */
+
+/**
+ * One POST turn. AG-UI events update messages and controls in the store; a
+ * text-v1 answer (backend flag off) goes to the caller's text handler.
+ * Returns the format the backend answered in.
+ */
+async function runAguiTurn(operation: ChatOperation, ctx: AguiTurnContext, fallback: AguiTextFallback = {}): Promise<ChatFormat> {
+	const store = useChatStore;
+	let traceId: string | undefined;
+
+	const updateMessage = (id: string, patch: (msg: ChatMessage) => ChatMessage) =>
+		store.setState((state) => ({ messages: state.messages.map((m) => (m.id === id ? patch(m) : m)) }));
+
+	const onEvent = (event: BaseEvent) => {
+		if (ctx.isStale()) return;
+		const e = event as BaseEvent & Record<string, any>;
+		switch (event.type) {
+			case "TEXT_MESSAGE_START": {
+				const message = {
+					...makeAssistantMessage(""),
+					id: String(e.messageId),
+					traceId,
+					...(ctx.questionId && { questionId: ctx.questionId, questionText: ctx.questionText })
+				} as ChatMessage;
+				store.setState((state) => ({ messages: [...state.messages, message] }));
+				break;
+			}
+			case "TEXT_MESSAGE_CONTENT":
+				updateMessage(String(e.messageId), (m) => (m.type === "card" ? { ...m, body: m.body + String(e.delta ?? "") } : m));
+				break;
+			case "TEXT_MESSAGE_END":
+				updateMessage(String(e.messageId), (m) => (m.type === "card" ? { ...m, showListenRow: true } : m));
+				break;
+			case "STATE_SNAPSHOT": {
+				const next = readAmulUiSnapshot(e.snapshot);
+				if (next) store.setState((state) => ({ amulUi: applySnapshot(state.amulUi, next) }));
+				break;
+			}
+			case "CUSTOM": {
+				if (e.name === AGUI_CUSTOM_ARTIFACTS) {
+					const value = e.value as ArtifactsEventValue | undefined;
+					if (value?.message_id && Array.isArray(value.artifacts)) {
+						updateMessage(value.message_id, (m) => (m.type === "card" ? { ...m, artifacts: value.artifacts } : m));
+					}
+				} else if (e.name === AGUI_CUSTOM_UI_ERROR) {
+					const value = e.value as ChatError | undefined;
+					store.setState({
+						toast: { message: aguiErrorText(translations, ctx.language, value?.error?.code, value?.error?.message), type: "error" }
+					});
+				}
+				break;
+			}
+			case "RUN_ERROR":
+				// The backend sends CUSTOM amul.ui_error first; this repeats the same text.
+				store.setState({
+					toast: { message: aguiErrorText(translations, ctx.language, e.code, e.message ? String(e.message) : null), type: "error" }
+				});
+				break;
+			default:
+				break;
+		}
+	};
+
+	const authToken = apiService.getBearerToken();
+	try {
+		return await runChatTurn(
+			{
+				apiUrl: aguiApiUrl(),
+				authToken,
+				threadId: ctx.sessionId,
+				operation,
+				sourceLang: ctx.language,
+				targetLang: ctx.language,
+				persona: getUiFlags().doctorPersonaSelector ? ctx.persona : undefined
+			},
+			{
+				onEvent,
+				onTextChunk: fallback.onTextChunk,
+				onTraceId: (id) => {
+					traceId = id;
+					fallback.onTraceId?.(id);
+				}
+			}
+		);
+	} catch (error) {
+		if (error instanceof ChatRequestError && error.status === 401) apiService.handleUnauthorized();
+		throw error;
+	}
+}
+
+/**
+ * Sends a command (change account, edit or cancel a booking) with the latest
+ * state_revision. `componentId` marks the control whose button started it.
+ */
+async function sendCommand(
+	build: (stateRevision: number) => ChatCommand,
+	language: string,
+	componentId: string | null = null
+): Promise<void> {
+	const { sessionId, persona, isAssistantTyping, submittingComponentId, amulUi } = useChatStore.getState();
+	if (!sessionId || isAssistantTyping || submittingComponentId) return;
+	useChatStore.setState({ submittingComponentId: componentId, isAssistantTyping: true, suggestions: [] });
+	const isStale = () => useChatStore.getState().sessionId !== sessionId || useChatStore.getState().persona !== persona;
+	try {
+		await runAguiTurn({ kind: "command", command: build(amulUi.state_revision) }, { language, sessionId, persona, isStale });
+	} catch (error) {
+		if (!isStale()) reportAguiError(error, language);
+	} finally {
+		if (!isStale()) useChatStore.setState({ submittingComponentId: null, isAssistantTyping: false });
+	}
+}
+
+/** Toast for a failed pick or command; the control itself stays as the server left it. */
+function reportAguiError(error: unknown, language: string) {
+	console.error("Interactive chat request failed:", error);
+	const body = error instanceof ChatRequestError ? error.body : null;
+	const message = body ? aguiErrorText(translations, language, body.error.code, body.error.message) : GENERIC_CHAT_ERROR;
+	useChatStore.setState({ toast: { message, type: "error" } });
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -320,6 +483,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 	isFetchingSuggestions: false,
 	sessionId: null,
 	persona: "farmer",
+	amulUi: emptyUiState(),
+	submittingComponentId: null,
 	showQuestionList: false,
 	toast: null,
 
@@ -381,6 +546,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 			isTranscribing: false,
 			isFetchingSuggestions: false,
 			showQuestionList: false,
+			amulUi: emptyUiState(),
+			submittingComponentId: null,
 		});
 		apiService.setSessionId(sid);
 	},
@@ -419,7 +586,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 			isListening: false,
 			isTranscribing: false,
 			isFetchingSuggestions: false,
-			showQuestionList: false
+			showQuestionList: false,
+			amulUi: emptyUiState(),
+			submittingComponentId: null
 		})),
 
 	// AMUL-78: brings the welcome question list back without clearing the
@@ -473,12 +642,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 			let streamedArtifacts: ChatArtifact[] = [];
 			let inlineSuggestions: string[] | null = null;
 			let traceId: string | undefined;
-			const _response = await apiService.sendUserQuery(
-				trimmed,
-				currentSession,
-				language, // source
-				language, // target
-				(chunk) => {
+			const onChunk = (chunk: string) => {
 					if (isTurnStale()) return;
 					wireText += chunk;
 					const parsed = parseChatWire(wireText);
@@ -502,12 +666,27 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 							};
 						}
 					});
-				},
-				getUiFlags().doctorPersonaSelector ? persona : undefined,
-				(id) => {
-					traceId = id;
-				}
-			);
+				};
+			let replyFormat: ChatFormat = "text-v1";
+			if (shouldUseAguiTransport()) {
+				replyFormat = await runAguiTurn(
+					{ kind: "message", text: trimmed },
+					{ language, sessionId: currentSession, persona, questionId, questionText: trimmed, isStale: isTurnStale },
+					{ onTextChunk: onChunk, onTraceId: (id) => { traceId = id; } }
+				);
+			} else {
+				await apiService.sendUserQuery(
+					trimmed,
+					currentSession,
+					language, // source
+					language, // target
+					onChunk,
+					getUiFlags().doctorPersonaSelector ? persona : undefined,
+					(id) => {
+						traceId = id;
+					}
+				);
+			}
 			if (isTurnStale()) return;
 
 			set((state) => {
@@ -533,7 +712,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 				// retry tail and prevents stale suggestions overwriting a newer turn).
 				const isStale = () =>
 					get().sessionId !== currentSession || get().isAssistantTyping;
-				const suggestions = await fetchSuggestionsWithRetry(currentSession, language, isStale);
+				const scope = replyFormat === "agui-v1" ? "agui-v1" : undefined;
+				const suggestions = await fetchSuggestionsWithRetry(currentSession, language, isStale, scope);
 				if (!isStale()) {
 					set({ suggestions: suggestions.map(s => ({ id: uuidv4(), text: s.question, label: s.question })) });
 				}
@@ -560,10 +740,50 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 				}));
 				try { telemetry.logErrorEvent(questionId, currentSession, "Rate limit error (429)"); } catch (e) { console.warn("Telemetry failed (error event)", e); }
 			} else {
-				set({ toast: { message: "Sorry, there was an error processing your request. Please try again.", type: "error" } });
+				const aguiBody = error instanceof ChatRequestError ? error.body : null;
+				set({
+					toast: {
+						message: aguiBody ? aguiErrorText(translations, language, aguiBody.error.code, aguiBody.error.message) : GENERIC_CHAT_ERROR,
+						type: "error"
+					}
+				});
 				try { telemetry.logErrorEvent(questionId, currentSession, String(error)); } catch (e) { console.warn("Telemetry failed (error event)", e); }
 			}
 		}
+	},
+
+	submitUiAction: async (action, language) => {
+		const { sessionId, persona, isAssistantTyping, submittingComponentId } = get();
+		if (!sessionId || isAssistantTyping || submittingComponentId) return;
+		set({ submittingComponentId: action.component_id, isAssistantTyping: true, suggestions: [] });
+		const isStale = () => get().sessionId !== sessionId || get().persona !== persona;
+		try {
+			await runAguiTurn({ kind: "ui_action", action }, { language, sessionId, persona, isStale });
+		} catch (error) {
+			if (!isStale()) reportAguiError(error, language);
+		} finally {
+			if (!isStale()) set({ submittingComponentId: null, isAssistantTyping: false });
+		}
+	},
+
+	changeMilkAccount: async (language) => {
+		await sendCommand((state_revision) => ({ kind: "change_milk_account", state_revision }), language);
+	},
+
+	editAiBooking: async (componentId, workflowId, field, language) => {
+		await sendCommand(
+			(state_revision) => ({ kind: "edit_ai_booking", workflow_id: workflowId, state_revision, field }),
+			language,
+			componentId
+		);
+	},
+
+	cancelAiBooking: async (componentId, workflowId, language) => {
+		await sendCommand(
+			(state_revision) => ({ kind: "cancel_ai_booking", workflow_id: workflowId, state_revision }),
+			language,
+			componentId
+		);
 	},
 
 	fetchSuggestionsForMessage: async (messageId) => {

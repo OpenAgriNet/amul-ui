@@ -4,12 +4,14 @@ import { ChatMessage } from "./chat-types";
 import { SystemBubble } from "./system-bubble";
 import { TextBubble } from "./text-bubble";
 import { MessageChrome } from "../message-chrome";
+import { InteractiveControls, onlyRepeatsControlTitle, useMessageComponents } from "./interactive";
 
 /* eslint-disable no-unused-vars */
 type BubbleProps = { message: ChatMessage; onQuickReply?: (payload: string) => void };
 /* eslint-enable no-unused-vars */
 
 export function Bubble({ message }: BubbleProps) {
+	const components = useMessageComponents(message.id);
 
 	switch (message.type) {
 		case "text":
@@ -18,12 +20,16 @@ export function Bubble({ message }: BubbleProps) {
 					<TextBubble message={message} />
 				</MessageChrome>
 			);
-		case "card":
+		case "card": {
+			// A message that only names its control shows the control alone.
+			const controlOnly = onlyRepeatsControlTitle(message.body, components);
 			return (
 				<MessageChrome role={message.role}>
-					<CardBubble message={message} />
+					{controlOnly ? null : <CardBubble message={message} />}
+					<InteractiveControls components={components} attached={!controlOnly} />
 				</MessageChrome>
 			);
+		}
 		// case "quick_replies":
 		// 	return (
 		// 		<MessageChrome role={message.role} showLabel={false}>
