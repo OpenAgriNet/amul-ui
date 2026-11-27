@@ -71,6 +71,13 @@ export function MessageList(props: MessageListProps) {
 		}
 	}, [props.messages.length, props.isAssistantTyping, props.messages]);
 
+	// AG-UI controls (pickers, review card) arrive in a state snapshot after the
+	// message text, without changing `messages`; bring them into view too.
+	const uiRevision = useChatStore((s) => s.amulUi.state_revision);
+	useEffect(() => {
+		if (uiRevision > 0 && props.messages.length > 0) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+	}, [uiRevision, props.messages.length]);
+
 	return (
 		// Radix wraps the viewport content in an inline `display: table` div, which grows to the
 		// widest child: one wide markdown table pushed every bubble past the screen edge. Block

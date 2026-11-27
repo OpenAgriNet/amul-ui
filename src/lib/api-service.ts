@@ -101,6 +101,11 @@ class ApiService {
     return this.authToken;
   }
 
+  /** Same handling the GET chat stream gives a 401, for callers that use fetch(). */
+  handleUnauthorized(): void {
+    this.redirectToErrorPage();
+  }
+
   private refreshAuthToken(): void {
     this.authToken = this.getAuthToken();
     if (this.authToken) {
@@ -236,7 +241,8 @@ class ApiService {
     }
   }
 
-  async getSuggestions(session: string, targetLang: string = 'gu'): Promise<SuggestionItem[]> {
+  // scope 'agui-v1' reads the suggestions of an AG-UI reply (signed-in farmers only).
+  async getSuggestions(session: string, targetLang: string = 'gu', scope?: 'agui-v1'): Promise<SuggestionItem[]> {
     try {
       this.refreshAuthToken();
       if (!this.validateAuth()) {
@@ -245,7 +251,8 @@ class ApiService {
       
       const params = {
         session_id: session,
-        target_lang: this.normalizeLanguageCode(targetLang, 'gu')
+        target_lang: this.normalizeLanguageCode(targetLang, 'gu'),
+        ...(scope && { scope })
       };
 
       const config = {
