@@ -25,6 +25,7 @@ import {
 	type BookingField,
 	type ChatCommand,
 	type ChatError,
+	type ChatFormat,
 	type ChatOperation,
 	type UIAction
 } from "@/lib/agui/types";
@@ -316,22 +317,24 @@ import { ANONYMOUS_BOOTSTRAP_SESSION_KEY } from "@/lib/anonymous-bootstrap";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// scope "agui-v1": the reply came over AG-UI, whose suggestions the backend keeps per signed-in farmer.
 async function fetchSuggestionsWithRetry(
 	sessionId: string,
 	language: string,
 	isStale?: () => boolean,
+	scope?: "agui-v1",
 ) {
 	const retryDelaysMs = [300, 700, 1200, 2000];
 	for (let attempt = 0; attempt < retryDelaysMs.length; attempt++) {
 		if (isStale?.()) return [];
-		const suggestions = await apiService.getSuggestions(sessionId, language);
+		const suggestions = await apiService.getSuggestions(sessionId, language, scope);
 		if (suggestions.length > 0) {
 			return suggestions;
 		}
 		await wait(retryDelaysMs[attempt] ?? 0);
 	}
 	if (isStale?.()) return [];
-	return await apiService.getSuggestions(sessionId, language);
+	return await apiService.getSuggestions(sessionId, language, scope);
 }
 
 type AguiTurnContext = {
@@ -353,8 +356,9 @@ type AguiTextFallback = {
 /**
  * One POST turn. AG-UI events update messages and controls in the store; a
  * text-v1 answer (backend flag off) goes to the caller's text handler.
+ * Returns the format the backend answered in.
  */
-async function runAguiTurn(operation: ChatOperation, ctx: AguiTurnContext, fallback: AguiTextFallback = {}): Promise<void> {
+async function runAguiTurn(operation: ChatOperation, ctx: AguiTurnContext, fallback: AguiTextFallback = {}): Promise<ChatFormat> {
 	const store = useChatStore;
 	let traceId: string | undefined;
 
@@ -413,7 +417,7 @@ async function runAguiTurn(operation: ChatOperation, ctx: AguiTurnContext, fallb
 
 	const authToken = apiService.getBearerToken();
 	try {
-		await runChatTurn(
+		return await runChatTurn(
 			{
 				apiUrl: aguiApiUrl(),
 				authToken,
@@ -663,8 +667,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 						}
 					});
 				};
+			let replyFormat: ChatFormat = "text-v1";
 			if (shouldUseAguiTransport()) {
-				await runAguiTurn(
+				replyFormat = await runAguiTurn(
 					{ kind: "message", text: trimmed },
 					{ language, sessionId: currentSession, persona, questionId, questionText: trimmed, isStale: isTurnStale },
 					{ onTextChunk: onChunk, onTraceId: (id) => { traceId = id; } }
@@ -707,7 +712,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 				// retry tail and prevents stale suggestions overwriting a newer turn).
 				const isStale = () =>
 					get().sessionId !== currentSession || get().isAssistantTyping;
-				const suggestions = await fetchSuggestionsWithRetry(currentSession, language, isStale);
+				const scope = replyFormat === "agui-v1" ? "agui-v1" : undefined;
+				const suggestions = await fetchSuggestionsWithRetry(currentSession, language, isStale, scope);
 				if (!isStale()) {
 					set({ suggestions: suggestions.map(s => ({ id: uuidv4(), text: s.question, label: s.question })) });
 				}
