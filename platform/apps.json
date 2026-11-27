@@ -14,5 +14,13 @@
 		"url": "https://grafana.prod.amulai.in/login/generic_oauth",
 		"thumbnail": "thumbs/grafana.webp",
 		"access": { "client": "grafana", "roles": ["admin", "editor", "viewer"] }
+	},
+	{
+		"id": "langfuse",
+		"name": "Langfuse",
+		"description": "LLM traces and evals: every agent turn, its tool calls and its quality scores.",
+		"url": "https://langfuse.prod.amulai.in",
+		"thumbnail": "thumbs/langfuse.webp",
+		"access": { "client": "langfuse", "roles": ["access"] }
 	}
 ]
