@@ -117,7 +117,9 @@ type ChatStore = {
 /* eslint-enable no-unused-vars */
 
 // AMUL-72 split the FAQ launcher in two. AMUL-118 raised the count from ten to
-// eleven so the animal-details fixed question fits without pushing biogas off.
+// eleven for the animal-details fixed question. AMUL-128 swapped biogas for the
+// fodder question, so the eleven cards are all pinned, FAQ or fixed, with no
+// random tail.
 const QUICK_ACTION_COUNT = 11;
 // AMUL-87: the third pinned slot is the weather question, which has to sit
 // above the FAQ cards rather than with the fixed questions below them.

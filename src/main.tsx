@@ -70,6 +70,7 @@ router.subscribe("onResolved", () => {
 import { LanguageProvider } from "./components/LanguageProvider";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ConfigProvider } from "./hooks/ConfigProvider";
+import { PreviewBackendPicker } from "./components/core/preview-backend-picker";
 
 // Not awaited: farmers should not wait for flags that only testers need.
 void loadUiFlags();
@@ -83,5 +84,7 @@ createRoot(document.getElementById("root")!).render(
 				</LanguageProvider>
 			</ConfigProvider>
 		</AuthProvider>
+		{/* Dev builds only: renders nothing when the API is not api.dev.amulai.in. */}
+		<PreviewBackendPicker />
 	</StrictMode>
 );

@@ -333,3 +333,26 @@ export default Screen;
 - Do not place logic inside layouts
 
 ---
+
+## Staff portal (`platform/`)
+
+`platform/` is a separate small app, the staff portal at https://platform.amulai.in. It has nothing to do with the farmer chat
+app above: no shared code, no build step, its own `Dockerfile` and image (`amul-platform`).
+
+- Static files served by nginx as a non-root user on port 8080 (`platform/nginx.conf`, `/healthz` for probes).
+- Sign-in is an oauth2-proxy sidecar in front of it (Keycloak realm `amul`). The page reads the signed-in user from
+  `/oauth2/userinfo` and signs out through `/oauth2/sign_out`, which also ends the Keycloak session.
+- Tiles come from `platform/apps.json`. Each entry: `id`, `name`, `description` (one line), `url`, `thumbnail` (a 16:9
+  WebP under `platform/thumbs/`), and `access`: `"any"` (every signed-in user) or `{ "client": "<client>", "roles": [...] }`
+  (users holding any of those Keycloak client roles, listed highest first; the first one held is the tile's badge).
+  oauth2-proxy lists the user's Keycloak roles in `groups` as `role:<client>:<role>`. Adding an app is one entry and one
+  thumbnail. A hidden tile is a convenience, not access control: each app checks access itself.
+- Thumbnails are real screenshots of each tool with every number blurred and anything naming a host or a person covered:
+  this repo is public.
+- Brand marks are the chat app's files, unaltered (`amul-logo.svg` = `public/AmulLogo.svg`, `amul-ai-wordmark.svg` =
+  `src/assets/amulText.svg`). Fonts are served from `platform/fonts/` (Bricolage Grotesque and Noto Sans, both SIL OFL);
+  no external font or image hosts. Light theme only.
+- Run locally: `docker build -t amul-platform platform/ && docker run --rm -p 8080:8080 amul-platform`. Without the proxy,
+  `/oauth2/userinfo` is missing, so the page shows its error line; the tiles need a real sign-in.
+- Deployment and build: the `amul-platform` Deployment and `scripts/run-amul-platform-build.sh` in the infra repo
+  (kaniko, build context `platform/`).

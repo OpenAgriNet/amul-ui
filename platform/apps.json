@@ -1,0 +1,18 @@
+[
+	{
+		"id": "lenspack",
+		"name": "lenspack",
+		"description": "Boards over Amul AI telemetry: the monthly report, quality scores and calls. Make your own and share them.",
+		"url": "https://lenspack.prod.amulai.in/",
+		"thumbnail": "thumbs/lenspack.webp",
+		"access": { "client": "lenspack", "roles": ["access"] }
+	},
+	{
+		"id": "grafana",
+		"name": "Grafana",
+		"description": "Health of the Amul AI services: GPUs and models, pods, ingress and alerts.",
+		"url": "https://grafana.prod.amulai.in/login/generic_oauth",
+		"thumbnail": "thumbs/grafana.webp",
+		"access": { "client": "grafana", "roles": ["admin", "editor", "viewer"] }
+	}
+]

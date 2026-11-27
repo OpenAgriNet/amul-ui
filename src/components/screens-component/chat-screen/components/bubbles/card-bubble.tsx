@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Copy, ThumbsDown, ThumbsUp, Volume2, Check } from "lucide-react";
+import { Bug, Copy, ThumbsDown, ThumbsUp, Volume2, Check } from "lucide-react";
 import { CardMessage } from "./chat-types";
 import { FeedbackModal } from "../feedback-modal";
+import { DebugPanel } from "../debug/debug-panel";
 import { useChatStore } from "@/hooks/store/chat";
 import { useLanguage } from "@/components/LanguageProvider";
 import { cn } from "@/lib/utils";
+import { useUiFlags } from "@/lib/ui-flags";
 import ReactMarkdown from "react-markdown";
 import { chatRehypePlugins, chatRemarkPlugins } from "./markdown-plugins";
 import { repairMarkdownTables } from "./markdown-tables";
@@ -23,6 +25,10 @@ export function CardBubble({ message }: { readonly message: CardMessage }) {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [showCopySuccess, setShowCopySuccess] = useState(false);
 	const [showThumbsUpSuccess, setShowThumbsUpSuccess] = useState(false);
+	// Dev and previews with the debug view on: what this answer's turn did, step by step.
+	const debugView = useUiFlags((s) => s.debugView);
+	const [debugOpen, setDebugOpen] = useState(false);
+	const canDebug = debugView && Boolean(message.traceId);
 
 	const handleListen = async () => {
 		try {
@@ -226,6 +232,22 @@ export function CardBubble({ message }: { readonly message: CardMessage }) {
 								>
 									<ThumbsDown className="h-4 w-4 text-[#F65151]" />
 								</Button>
+
+								{canDebug ? (
+									<>
+										<div className="h-5 w-px self-center bg-gray-200 dark:bg-green-800/30" />
+										<Button
+											variant="ghost"
+											size="icon"
+											className="flex-1 h-10 w-12 rounded-none text-foreground/60 transition-all hover:bg-gray-100 dark:text-gray-400 cursor-pointer"
+											title="Debug: what this answer did"
+											aria-label="Debug"
+											onClick={() => setDebugOpen(true)}
+										>
+											<Bug className="h-4 w-4 text-gray-500" />
+										</Button>
+									</>
+								) : null}
 							</div>
 							</div>
 						</div>
@@ -239,6 +261,8 @@ export function CardBubble({ message }: { readonly message: CardMessage }) {
 				onClose={() => setFeedbackModalOpen(false)}
 				onSubmit={handleFeedbackSubmit}
 			/>
+
+			{canDebug && message.traceId ? <DebugPanel traceId={message.traceId} open={debugOpen} onOpenChange={setDebugOpen} /> : null}
 		</>
 	);
 }
